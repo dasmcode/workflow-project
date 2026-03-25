@@ -5,3 +5,5 @@ pydantic
 python-dotenv
 sqlalchemy
 psycopg2-binary
+fastapi
+python-multipart
