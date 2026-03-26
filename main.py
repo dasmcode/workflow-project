@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.routers import IncludeAPIRouter
+from app.core.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Perform any startup tasks here
     print("Starting up the application...")
+    init_db()
     yield
-    # Perform any shutdown tasks here
     print("Shutting down the application...")
     
 def init_application():
