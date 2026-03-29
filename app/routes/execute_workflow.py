@@ -13,7 +13,8 @@ def execute_workflow(request: WorkflowExecutionRequest, db:Session = Depends(get
         job = Job(file_id=request.file_id, workflow_type=request.workflow_type)
         db.add(job)
         db.commit()
-        return JSONResponse(content={"message": f"Workflow {request.workflow_type} executed successfully with file ID {request.file_id}"}, status_code=200)
+        db.refresh(job)
+        return JSONResponse(content={"message": f"Workflow {request.workflow_type} executed successfully with job ID {job.id}"}, status_code=200)
     except Exception as e:
         db.rollback()
         return JSONResponse(content={"error": str(e)}, status_code=500)

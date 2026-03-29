@@ -1,0 +1,30 @@
+services:
+  app:
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    build: .
+    ports:
+      - 8000:8000
+    environment:
+      - database=${database}
+      - password=${password}
+      - username=${username}
+      - server=postgres
+  postgres:
+    networks:
+      - app-network
+    image: postgres
+    environment:
+      - POSTGRES_DB=${database}
+      - POSTGRES_USER=${username}
+      - POSTGRES_PASSWORD=${password}
+    ports:
+      - 5432:5432
+    volumes:
+      - pg_data:/var/lib/postgresql
+volumes:
+  pg_data:
+networks:
+  app-network:
