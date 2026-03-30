@@ -5,6 +5,8 @@ from app.core.database import get_db
 from app.models.jobs import Job,FileState
 from app.models.request_payloads import WorkflowExecutionRequest
 from app.utils.file_handler import save_file
+from app.core.queue import queue
+from app.workers.tasks import process_job
 router = APIRouter()
 
 @router.post("/execute/")
@@ -14,17 +16,18 @@ def execute_workflow(request: WorkflowExecutionRequest, db:Session = Depends(get
         db.add(job)
         db.commit()
         db.refresh(job)
+        queue.enqueue(process_job, str(job.id))
         return JSONResponse(content={"message": f"Workflow {request.workflow_type} executed successfully with job ID {job.id}"}, status_code=200)
     except Exception as e:
         db.rollback()
         return JSONResponse(content={"error": str(e)}, status_code=500)
     
-@router.get("/status/{job_id}")
+@router.get("/job/{job_id}")
 def get_job_status(job_id:str, db:Session = Depends(get_db)):
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        return JSONResponse(content={"job_id": str(job.id), "status": job.status.value, "current_step": job.current_step}, status_code=200)
+        return JSONResponse(content={"job_id": str(job.id),"file_id": str(job.file_id),"workflow_type": job.workflow_type, "status": job.status.value, "current_step": job.current_step,  "created_at": str(job.created_at)}, status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
