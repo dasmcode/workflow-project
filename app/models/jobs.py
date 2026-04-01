@@ -17,7 +17,7 @@ class FileState(Enum):
     cancelled = "cancelled"
 
 class Job(Base):
-    __tablename__ = "jobs_new"
+    __tablename__ = "jobs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     file_id = Column(String)

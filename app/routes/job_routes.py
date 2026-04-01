@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from app.core.database import get_db
-from app.models.jobs import Job
+from app.models.jobs import FileState, Job
 router = APIRouter()
 
 @router.get("/job/{job_id}")
@@ -23,7 +23,21 @@ def get_all_jobs(db:Session = Depends(get_db)):
         return JSONResponse(content={"jobs": job_list}, status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
-    
+
+@router.post("/cancel-job/{job_id}")
+def cancel_job(job_id:str, db:Session = Depends(get_db)):
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return JSONResponse(content={"error": "Job not found"}, status_code=404)
+        if job.status in [FileState.completed, FileState.failed, FileState.cancelled]:
+            return JSONResponse(content={"error": f"Cannot cancel a job that is already {job.status.value}"}, status_code=400)
+        job.status = FileState.cancel_requested
+        db.commit()
+        return JSONResponse(content={"message": f"Cancel request submitted for job with ID {job_id}"}, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
 @router.delete("/delete-job/{job_id}")
 def delete_job(job_id:str, db:Session = Depends(get_db)):
     try:

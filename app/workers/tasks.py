@@ -1,7 +1,7 @@
 import time
 from app.core.database import SessionLocal
-from app.core.queue import queue
 from app.models.jobs import Job, FileState
+from app.services.cancel_service import check_cancel
 
 def process_job(job_id:str):
     db = SessionLocal()
@@ -16,11 +16,15 @@ def process_job(job_id:str):
         # Simulate processing steps
         steps = ["Step 1: Validating file", "Step 2: Processing data", "Step 3: Finalizing"]
         for step in steps:
+            if check_cancel(db, job):
+                print(f"Job {job_id} cancelled during processing")
+                return
             job.current_step = step
             db.commit()
-            time.sleep(5)  # Simulate time taken for each step
+            time.sleep(15)  # Simulate time taken for each step
         job.status = FileState.completed
         job.current_step = "completed"
+        job.result = "Job processed successfully"
         db.commit()
     except Exception as e:
         if job:
