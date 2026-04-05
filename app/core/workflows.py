@@ -6,8 +6,7 @@ WORKFLOWS = {
     "rag": [
         "extract_text",
         "chunk",
-        "embed",
-        "store",
+        "embed_and_store",
         "query"
     ]
 }

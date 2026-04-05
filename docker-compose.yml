@@ -1,8 +1,9 @@
 services:
-  app:
+  backend:
     depends_on:
       - postgres
       - redis
+      - qdrant
     networks:
       - app-network
     build: .
@@ -12,6 +13,8 @@ services:
       POSTGRES_SERVER: postgres
       REDIS_SERVER: redis
       QDRANT_SERVER: qdrant
+    volumes:
+      - uploads_files:/appuser/uploads
   worker:
     depends_on:
       - postgres
@@ -24,6 +27,8 @@ services:
       POSTGRES_SERVER: postgres
       REDIS_SERVER: redis
       QDRANT_SERVER: qdrant
+    volumes:
+      - uploads_files:/appuser/uploads
   postgres:
     networks:
       - app-network
@@ -56,5 +61,6 @@ volumes:
   pg_data:
   redis-data:
   qdrant_data:
+  uploads_files:
 networks:
   app-network:

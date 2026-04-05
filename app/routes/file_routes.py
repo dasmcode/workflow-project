@@ -13,7 +13,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
     try:
         contents = await file.read()
         file_path,file_id = save_file(contents,file.filename)
-        file = Files(file_id=file_id,filename=file.filename, filepath=file_path)
+        file = Files(id=file_id,filename=file.filename, filepath=file_path)
         db.add(file)
         db.commit()
         db.refresh(file)

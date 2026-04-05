@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from app.core.database import get_db
-from app.models.jobs import Job,FileState
+from app.models.jobs import Job
+from app.models.files import Files
 from app.models.request_payloads import WorkflowExecutionRequest
 from app.utils.file_handler import save_file
 from app.core.queue import queue
@@ -12,6 +13,9 @@ router = APIRouter()
 @router.post("/execute/")
 def execute_workflow(request: WorkflowExecutionRequest, db:Session = Depends(get_db)):
     try:
+        file = db.query(Files).filter(Files.id == request.file_id).first()
+        if not file:
+            return JSONResponse(content={"error": "File not found"}, status_code=404)
         job = Job(file_id=request.file_id, workflow_type=request.workflow_type)
         db.add(job)
         db.commit()

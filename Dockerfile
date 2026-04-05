@@ -13,16 +13,20 @@ FROM python:3.12-slim
 RUN python -m pip install --upgrade --no-cache-dir pip setuptools wheel
 RUN apt-get update && \
     apt-get -y dist-upgrade && \
+    apt-get install -y gosu && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 RUN groupadd -g 10000 appgroup && useradd -m -u 10000 -g appgroup appuser
-RUN mkdir -p /app && chown -R appuser:appgroup /app
-WORKDIR /app
+RUN mkdir -p /appuser && chown -R appuser:appgroup /appuser
+WORKDIR /appuser
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
 RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 RUN pip uninstall -y pip setuptools wheel
 EXPOSE 8000
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 COPY --chown=appuser:appgroup . .
-USER appuser
+ENTRYPOINT ["/entrypoint.sh"]
+ENV PYTHONUNBUFFERED=1
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

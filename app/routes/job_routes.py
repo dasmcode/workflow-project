@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from app.core.database import get_db
 from app.models.jobs import FileState, Job
+from app.services.retrieval import query_rag
+from app.models.request_payloads import QueryRequest
 
 router = APIRouter()
 
@@ -101,4 +103,15 @@ def delete_all_jobs(db: Session = Depends(get_db)):
         )
     except Exception as e:
         db.rollback()
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+@router.post("/query-job/{job_id}")
+def query_job(job_id: str, query: QueryRequest, db: Session = Depends(get_db)):
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return JSONResponse(content={"error": "Job not found"}, status_code=404)
+        answer = query_rag(job,query.query)
+        return JSONResponse(content={"answer": answer}, status_code=200)
+    except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)

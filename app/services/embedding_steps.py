@@ -1,20 +1,36 @@
 from app.core.openai_client import client
 from app.core.qdrant_client import client as qdrant_client, QDRANT_COLLECTION
-from qdrant_client.models import PointStruct
+from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct
 import uuid
 from app.models.jobs import Job
+from app.core.database import SessionLocal
+from app.services.cancel_service import check_cancel
 
-def get_embeddings(chunks:list[str]):
+def get_embeddings(job:Job,chunks:list[str]):
     embeddings = []
-    for chunk in chunks:
-        response = client.embeddings.create(input=chunk, model="text-embedding-3-small")
-        embedding = response.data[0].embedding
-        embeddings.append(embedding)
-    return embeddings
+    db = SessionLocal()
+    try:
+        for chunk in chunks:
+            if check_cancel(db, job):
+                print(f"Job with id {job.id} has been cancelled")
+                return False
+            response = client.embeddings.create(input=chunk, model="text-embedding-3-small")
+            embedding = response.data[0].embedding
+            embeddings.append(embedding)
+        return embeddings
+    except Exception as e:
+        print(f"Error getting embeddings for job ID {job.id}: {str(e)}")
+        return False
+    finally:
+        db.close()
 
 def store_embeddings(job:Job, chunks:list[str], embeddings:list[list[float]]):
     points = []
+    db = SessionLocal()
     for chunk, embedding in zip(chunks, embeddings):
+        if check_cancel(db, job):
+            print(f"Job with id {job.id} has been cancelled")
+            return False
         point = PointStruct(
             id=str(uuid.uuid4()),
             vector=embedding,
@@ -22,11 +38,20 @@ def store_embeddings(job:Job, chunks:list[str], embeddings:list[list[float]]):
         )
         points.append(point)
     qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=points)
+    return True
     
-def search_similar(query_embedding:list[float], top_k:int = 5):
-    search_result = qdrant_client.search(
+def search_similar(job:Job, query_embedding:list[float], top_k:int = 5):
+    search_result = qdrant_client.query_points(
         collection_name=QDRANT_COLLECTION,
-        query_vector=query_embedding,
+        query=query_embedding,
+        query_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="job_id",
+                    match=MatchValue(value=str(job.id))
+                )
+            ]
+        ),
         limit=top_k
     )
-    return [hit.payload["text"] for hit in search_result]
+    return [hit.payload["text"] for hit in search_result.points]

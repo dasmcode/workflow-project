@@ -8,4 +8,6 @@ def check_cancel(db, job:Job):
         job.cancelled_at = datetime.datetime.now()
         db.commit()
         return True
+    if job.status == FileState.cancelled:
+        return True
     return False
