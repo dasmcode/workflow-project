@@ -1,12 +1,14 @@
-from sqlalchemy import Column, String, DateTime,Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
 from app.core.database import Base
 from enum import Enum
 
+
 def current_time():
     return datetime.now()
+
 
 class FileState(Enum):
     pending = "pending"
@@ -16,14 +18,19 @@ class FileState(Enum):
     cancel_requested = "cancel_requested"
     cancelled = "cancelled"
 
+
 class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     file_id = Column(String)
     workflow_type = Column(String)
-    status = Column(SQLEnum(FileState,name="file_state",native_enum=True),default=FileState.pending)
+    status = Column(
+        SQLEnum(FileState, name="file_state", native_enum=True),
+        default=FileState.pending,
+    )
     current_step = Column(String, nullable=True)
+    step_index = Column(Integer, default=0)
     result = Column(String, nullable=True)
     created_at = Column(DateTime, default=current_time)
     updated_at = Column(DateTime, default=current_time)

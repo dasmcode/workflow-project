@@ -9,8 +9,9 @@ services:
     ports:
       - 8000:8000
     environment:
-       server : postgres
-       REDIS_SERVER : redis
+      POSTGRES_SERVER: postgres
+      REDIS_SERVER: redis
+      QDRANT_SERVER: qdrant
   worker:
     depends_on:
       - postgres
@@ -20,16 +21,17 @@ services:
     build: .
     command: python -m app.workers.worker
     environment:
-       server : postgres
-       REDIS_SERVER : redis
+      POSTGRES_SERVER: postgres
+      REDIS_SERVER: redis
+      QDRANT_SERVER: qdrant
   postgres:
     networks:
       - app-network
     image: postgres
     environment:
-       POSTGRES_DB : ${database}
-       POSTGRES_USER : ${username}
-       POSTGRES_PASSWORD : ${password}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - 5432:5432
     volumes:
@@ -42,8 +44,17 @@ services:
       - 6379:6379
     volumes:
       - redis-data:/data
+  qdrant:
+    networks:
+      - app-network
+    image: qdrant/qdrant
+    ports:
+      - 6333:6333
+    volumes:
+      - qdrant_data:/qdrant/storage
 volumes:
   pg_data:
   redis-data:
+  qdrant_data:
 networks:
   app-network:

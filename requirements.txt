@@ -9,3 +9,7 @@ fastapi
 python-multipart
 redis
 rq
+openai
+tiktoken
+qdrant-client
+pymupdf

@@ -12,12 +12,11 @@ router = APIRouter()
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     try:
         contents = await file.read()
-        file_path = save_file(contents,file.filename)
-        file = Files(filename=file.filename, filepath=file_path)
+        file_path,file_id = save_file(contents,file.filename)
+        file = Files(file_id=file_id,filename=file.filename, filepath=file_path)
         db.add(file)
         db.commit()
         db.refresh(file)
-        file_id = str(file.id)
         return JSONResponse(content={"file_id": file_id, "file_path": file_path},status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)},status_code=500)

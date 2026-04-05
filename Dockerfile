@@ -20,6 +20,7 @@ RUN mkdir -p /app && chown -R appuser:appgroup /app
 WORKDIR /app
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 RUN pip uninstall -y pip setuptools wheel
 EXPOSE 8000
 COPY --chown=appuser:appgroup . .

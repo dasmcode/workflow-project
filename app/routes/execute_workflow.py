@@ -6,7 +6,7 @@ from app.models.jobs import Job,FileState
 from app.models.request_payloads import WorkflowExecutionRequest
 from app.utils.file_handler import save_file
 from app.core.queue import queue
-from app.workers.tasks import process_job
+from app.workers.tasks import process_step
 router = APIRouter()
 
 @router.post("/execute/")
@@ -16,7 +16,7 @@ def execute_workflow(request: WorkflowExecutionRequest, db:Session = Depends(get
         db.add(job)
         db.commit()
         db.refresh(job)
-        queue.enqueue(process_job, str(job.id))
+        queue.enqueue(process_step, str(job.id))
         return JSONResponse(content={"message": f"Workflow {request.workflow_type} executed successfully with job ID {job.id}"}, status_code=200)
     except Exception as e:
         db.rollback()

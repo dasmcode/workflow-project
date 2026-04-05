@@ -1,36 +1,55 @@
-import time
+from app.core.workflows import WORKFLOWS
+from app.services.cancel_service import check_cancel
 from app.core.database import SessionLocal
 from app.models.jobs import Job, FileState
-from app.services.cancel_service import check_cancel
+from app.services.steps import execute_step
+from app.core.queue import queue
 
-def process_job(job_id:str):
+def process_step(job_id:str):
     db = SessionLocal()
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             print(f"Job with ID {job_id} not found")
             return
-        job.status = FileState.processing
-        job.current_step = "started"
-        db.commit()
-        # Simulate processing steps
-        steps = ["Step 1: Validating file", "Step 2: Processing data", "Step 3: Finalizing"]
-        for step in steps:
-            if check_cancel(db, job):
-                print(f"Job {job_id} cancelled during processing")
-                return
-            job.current_step = step
-            db.commit()
-            time.sleep(15)  # Simulate time taken for each step
-        job.status = FileState.completed
-        job.current_step = "completed"
-        job.result = "Job processed successfully"
-        db.commit()
-    except Exception as e:
-        if job:
+        if check_cancel(db, job):
+            print(f"Job with ID {job_id} has been cancelled")
+            return
+        workflow = WORKFLOWS.get(job.workflow_type)
+        
+        if not workflow:
+            print(f"Workflow type {job.workflow_type} not found for job ID {job_id}")
             job.status = FileState.failed
-            job.current_step = "failed"
             db.commit()
-        print(f"Error processing job {job_id}: {str(e)}")
+            return
+        step_index = job.step_index
+        current_step = workflow[step_index]
+        
+        job.status = FileState.processing
+        job.current_step = current_step
+        db.commit()
+        db.refresh(job)
+        
+        execute_step(current_step, job)
+        
+        if check_cancel(db, job):
+            print(f"Job with ID {job_id} has been cancelled after step execution")
+            return
+        
+        job.step_index +=1
+        db.commit()
+        db.refresh(job)
+        
+        if job.step_index < len(workflow):
+            queue.enqueue(process_step, str(job.id))
+        else:
+            job.status = FileState.completed
+            db.commit()
+            print(f"Job with ID {job_id} completed successfully")
+    except Exception as e:
+        print(f"Error processing job with ID {job_id}: {str(e)}")
+        job.status = FileState.failed
+        db.commit()
     finally:
         db.close()
+        
