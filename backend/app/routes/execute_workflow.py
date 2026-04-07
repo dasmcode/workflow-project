@@ -25,13 +25,3 @@ def execute_workflow(request: WorkflowExecutionRequest, db:Session = Depends(get
     except Exception as e:
         db.rollback()
         return JSONResponse(content={"error": str(e)}, status_code=500)
-    
-@router.get("/job/{job_id}")
-def get_job_status(job_id:str, db:Session = Depends(get_db)):
-    try:
-        job = db.query(Job).filter(Job.id == job_id).first()
-        if not job:
-            return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        return JSONResponse(content={"job_id": str(job.id),"file_id": str(job.file_id),"workflow_type": job.workflow_type, "status": job.status.value, "current_step": job.current_step,  "created_at": str(job.created_at)}, status_code=200)
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)

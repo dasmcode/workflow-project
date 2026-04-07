@@ -12,6 +12,7 @@ router = APIRouter()
 @router.get("/job/{job_id}")
 def get_job_status(job_id: str, db: Session = Depends(get_db)):
     try:
+        print("currently in new job status endpoint")
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
@@ -22,7 +23,11 @@ def get_job_status(job_id: str, db: Session = Depends(get_db)):
                 "workflow_type": job.workflow_type,
                 "status": job.status.value,
                 "current_step": job.current_step,
+                "step_index": job.step_index,
+                "result": job.result,
                 "created_at": str(job.created_at),
+                "updated_at": str(job.updated_at),
+                "cancelled_at": str(job.cancelled_at) if job.cancelled_at else None,
             },
             status_code=200,
         )
@@ -104,14 +109,15 @@ def delete_all_jobs(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         return JSONResponse(content={"error": str(e)}, status_code=500)
-    
+
+
 @router.post("/query-job/{job_id}")
 def query_job(job_id: str, query: QueryRequest, db: Session = Depends(get_db)):
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        answer = query_rag(job,query.query)
+        answer = query_rag(job, query.query)
         return JSONResponse(content={"answer": answer}, status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
