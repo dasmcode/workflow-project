@@ -4,21 +4,23 @@ from app.core.database import SessionLocal
 from app.models.jobs import Job, FileState
 from app.services.steps import execute_step
 from app.core.queue import queue
+import logging
+logger = logging.getLogger(__name__)
 
 def process_step(job_id:str):
     db = SessionLocal()
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
-            print(f"Job with ID {job_id} not found")
+            logger.error(f"Job with ID {job_id} not found")
             return
         if check_cancel(db, job):
-            print(f"Job with ID {job_id} has been cancelled")
+            logger.info(f"Job with ID {job_id} has been cancelled")
             return
         workflow = WORKFLOWS.get(job.workflow_type)
         
         if not workflow:
-            print(f"Workflow type {job.workflow_type} not found for job ID {job_id}")
+            logger.error(f"Workflow type {job.workflow_type} not found for job ID {job_id}")
             job.status = FileState.failed
             db.commit()
             return
@@ -33,7 +35,7 @@ def process_step(job_id:str):
         execute_step(current_step, job)
         
         if check_cancel(db, job):
-            print(f"Job with ID {job_id} has been cancelled after step execution")
+            logger.info(f"Job with ID {job_id} has been cancelled after step execution")
             return
         
         job.step_index +=1
@@ -45,9 +47,9 @@ def process_step(job_id:str):
         else:
             job.status = FileState.completed
             db.commit()
-            print(f"Job with ID {job_id} completed successfully")
+            logger.info(f"Job with ID {job_id} completed successfully")
     except Exception as e:
-        print(f"Error processing job with ID {job_id}: {str(e)}")
+        logger.error(f"Error processing job with ID {job_id}: {str(e)}")
         job.status = FileState.failed
         db.commit()
     finally:

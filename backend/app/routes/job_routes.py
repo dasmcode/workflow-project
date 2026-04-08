@@ -12,7 +12,6 @@ router = APIRouter()
 @router.get("/job/{job_id}")
 def get_job_status(job_id: str, db: Session = Depends(get_db)):
     try:
-        print("currently in new job status endpoint")
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)

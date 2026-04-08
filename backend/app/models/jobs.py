@@ -15,6 +15,7 @@ class FileState(Enum):
     processing = "processing"
     completed = "completed"
     failed = "failed"
+    retrying = "retrying"
     cancel_requested = "cancel_requested"
     cancelled = "cancelled"
 
@@ -35,3 +36,6 @@ class Job(Base):
     created_at = Column(DateTime, default=current_time)
     updated_at = Column(DateTime, default=current_time)
     cancelled_at = Column(DateTime, nullable=True)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    error_message = Column(String, nullable=True)

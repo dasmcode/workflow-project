@@ -1,7 +1,11 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 class IncludeAPIRouter(object):
     def __new__(cls):
         api_prefix = "/api/v1"
-        print("Inside IncludeAPIRouter")
+        logger.info("Inside IncludeAPIRouter")
         from app.routes.health_check import router as health_check_router
         from app.routes.file_routes import router as upload_file_router
         from app.routes.execute_workflow import router as execute_file_router

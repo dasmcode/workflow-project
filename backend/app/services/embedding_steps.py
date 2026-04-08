@@ -5,6 +5,8 @@ import uuid
 from app.models.jobs import Job
 from app.core.database import SessionLocal
 from app.services.cancel_service import check_cancel
+import logging
+logger = logging.getLogger(__name__)
 
 def get_embeddings(job:Job,chunks:list[str]):
     embeddings = []
@@ -12,14 +14,14 @@ def get_embeddings(job:Job,chunks:list[str]):
     try:
         for chunk in chunks:
             if check_cancel(db, job):
-                print(f"Job with id {job.id} has been cancelled")
+                logger.info(f"Job with id {job.id} has been cancelled")
                 return False
             response = client.embeddings.create(input=chunk, model="text-embedding-3-small")
             embedding = response.data[0].embedding
             embeddings.append(embedding)
         return embeddings
     except Exception as e:
-        print(f"Error getting embeddings for job ID {job.id}: {str(e)}")
+        logger.error(f"Error getting embeddings for job ID {job.id}: {str(e)}")
         return False
     finally:
         db.close()
@@ -29,7 +31,7 @@ def store_embeddings(job:Job, chunks:list[str], embeddings:list[list[float]]):
     db = SessionLocal()
     for chunk, embedding in zip(chunks, embeddings):
         if check_cancel(db, job):
-            print(f"Job with id {job.id} has been cancelled")
+            logger.info(f"Job with id {job.id} has been cancelled")
             return False
         point = PointStruct(
             id=str(uuid.uuid4()),

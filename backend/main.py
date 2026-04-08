@@ -4,6 +4,7 @@ from app.routers import IncludeAPIRouter
 from app.core.database import init_db
 from app.core.qdrant_client import create_collection
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.logging_config import setup_logging
 
 origins = [
     "http://localhost:3000",
@@ -13,6 +14,7 @@ origins = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up the application...")
+    setup_logging()
     init_db()
     create_collection()
     yield
