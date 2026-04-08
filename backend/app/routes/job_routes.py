@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from app.core.database import get_db
-from app.models.jobs import FileState, Job
+from app.models.jobs import JobStatus, Job
 from app.services.retrieval import query_rag
 from app.models.request_payloads import QueryRequest
+from app.services.job_state import transition_job
 
 router = APIRouter()
 
@@ -60,14 +61,14 @@ def cancel_job(job_id: str, db: Session = Depends(get_db)):
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        if job.status in [FileState.completed, FileState.failed, FileState.cancelled]:
+        if job.status in [JobStatus.completed, JobStatus.failed, JobStatus.cancelled]:
             return JSONResponse(
                 content={
                     "error": f"Cannot cancel a job that is already {job.status.value}"
                 },
                 status_code=400,
             )
-        job.status = FileState.cancel_requested
+        transition_job(job, JobStatus.cancel_requested)
         db.commit()
         return JSONResponse(
             content={"message": f"Cancel request submitted for job with ID {job_id}"},

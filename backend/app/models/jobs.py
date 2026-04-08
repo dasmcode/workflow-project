@@ -10,7 +10,7 @@ def current_time():
     return datetime.now()
 
 
-class FileState(Enum):
+class JobStatus(Enum):
     pending = "pending"
     processing = "processing"
     completed = "completed"
@@ -27,8 +27,8 @@ class Job(Base):
     file_id = Column(String)
     workflow_type = Column(String)
     status = Column(
-        SQLEnum(FileState, name="file_state", native_enum=True),
-        default=FileState.pending,
+        SQLEnum(JobStatus, name="job_status", native_enum=True),
+        default=JobStatus.pending,
     )
     current_step = Column(String, nullable=True)
     step_index = Column(Integer, default=0)
