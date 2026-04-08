@@ -14,9 +14,10 @@ def process_step(job_id: str):
     db = SessionLocal()
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
+        logger.info(f"Processing job with ID {job_id}, current status: {job.status}")
         if not job:
             logger.error(f"Job with ID {job_id} not found")
-            return
+            raise Exception("Job not found")
         if check_cancel(db, job):
             logger.info(f"Job with ID {job_id} has been cancelled")
             return
@@ -31,8 +32,8 @@ def process_step(job_id: str):
             return
         step_index = job.step_index
         current_step = workflow[step_index]
-
-        transition_job(job, JobStatus.processing)
+        if job.status == JobStatus.pending:
+            transition_job(job, JobStatus.processing)
         job.current_step = current_step
         db.commit()
         db.refresh(job)
@@ -50,6 +51,9 @@ def process_step(job_id: str):
         if job.step_index < len(workflow):
             queue.enqueue(process_step, str(job.id))
         else:
+            if check_cancel(db, job):
+                logger.info(f"Job with ID {job_id} has been cancelled before completion")
+                return
             transition_job(job, JobStatus.completed)
             db.commit()
             logger.info(f"Job with ID {job_id} completed successfully")

@@ -19,6 +19,9 @@ def execute_step(step_name:str, job:Job):
         logger.info(f"Summarizing for job ID {job.id}")
         try:
             summary = run_with_retry(lambda: query_summarize(job, context=text), job, step_name)
+            if not summary:
+                job.result = "Summarization failed or was cancelled"
+                return
             job.result = summary    
         except Exception as e:
             logger.error(f"Error occurred while summarizing for job ID {job.id}: {str(e)}")

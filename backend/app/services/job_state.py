@@ -1,7 +1,7 @@
 from app.models.jobs import Job, JobStatus
 
 VALID_TRANSITIONS = {
-    JobStatus.pending: [JobStatus.processing, JobStatus.cancel_requested],
+    JobStatus.pending: [JobStatus.processing, JobStatus.cancel_requested, JobStatus.failed],
     JobStatus.processing: [JobStatus.completed, JobStatus.failed, JobStatus.cancel_requested, JobStatus.retrying],
     JobStatus.retrying: [JobStatus.processing, JobStatus.failed, JobStatus.cancel_requested],
     JobStatus.cancel_requested: [JobStatus.cancelled],

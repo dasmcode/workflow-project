@@ -1,15 +1,27 @@
 FROM python:3.12 AS builder
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1
 RUN apt-get update && \
     apt-get -y dist-upgrade && \
-    apt-get install -y --no-install-recommends build-essential ca-certificates && \
-    apt-get clean && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libffi-dev \
+    cargo \
+    rustc \
+    ca-certificates \
+    && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /wheels
 COPY requirements.txt .
 RUN python -m pip install --upgrade --no-cache-dir pip setuptools wheel && \
     pip wheel --no-cache-dir --wheel-dir=/wheels -r requirements.txt
 
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN python -m pip install --upgrade --no-cache-dir pip setuptools wheel
 RUN apt-get update && \
     apt-get -y dist-upgrade && \

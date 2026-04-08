@@ -55,6 +55,9 @@ def query_summarize(job: Job, query: str = "Summarize this document", context: s
         prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         system_prompt = "You are a helpful assistant that answers questions based on the provided context."
         answer = call_llm_with_context(prompt, system_prompt)
+        if check_cancel(db, job):
+            logger.info(f"Job with id {job.id} has been cancelled")
+            return False
         return answer
     except Exception as e:
         logger.error(f"Error during summarize query for job ID {job.id}: {str(e)}")

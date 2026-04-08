@@ -15,7 +15,9 @@ def run_with_retry(step_func, job: Job, step_name):
             db = SessionLocal()
             logger.info(f"Running step {step_name} (attempt {job.retry_count+1})")
             result = step_func()
-
+            if job.status == JobStatus.retrying:
+                transition_job(job, JobStatus.processing)
+                db.commit()
             return result
 
         except Exception as e:
@@ -33,6 +35,6 @@ def run_with_retry(step_func, job: Job, step_name):
                 db.commit()
                 return
 
-            time.sleep(2)
+            time.sleep(2*job.retry_count)
         finally:
             db.close()

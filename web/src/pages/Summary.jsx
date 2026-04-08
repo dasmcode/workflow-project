@@ -2,10 +2,12 @@ import Layout from "../components/Layout";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getJobStatus } from "../api/api";
-import { Typography, Card, CardContent, CircularProgress } from "@mui/material";
+
+import { Card, CardContent, Typography, CircularProgress } from "@mui/material";
 
 export default function Summary() {
   const { jobId } = useParams();
+
   const [job, setJob] = useState(null);
 
   useEffect(() => {
@@ -21,13 +23,19 @@ export default function Summary() {
 
   return (
     <Layout>
-      <Typography variant="h5" gutterBottom>
-        Summary
-      </Typography>
-
-      <Card sx={{ maxWidth: 800, margin: "auto", mt: 4 }}>
+      <Card sx={{ maxWidth: 900, margin: "0 auto" }}>
         <CardContent>
-          <Typography>{job.result || "No summary available"}</Typography>
+          <Typography variant="h6">Summary</Typography>
+
+          <Typography
+            sx={{
+              mt: 2,
+              whiteSpace: "pre-line",
+              lineHeight: 1.6,
+            }}
+          >
+            {job.result}
+          </Typography>
         </CardContent>
       </Card>
     </Layout>

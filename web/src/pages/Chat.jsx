@@ -2,10 +2,12 @@ import Layout from "../components/Layout";
 import { useParams } from "react-router-dom";
 import { useState } from "react";
 import { queryJob } from "../api/api";
+
 import { Box, TextField, Button } from "@mui/material";
 
 export default function Chat() {
   const { jobId } = useParams();
+
   const [q, setQ] = useState("");
   const [messages, setMessages] = useState([]);
 
@@ -23,13 +25,7 @@ export default function Chat() {
 
   return (
     <Layout>
-      <Box
-        sx={{
-          flex: 1,
-          overflowY: "auto",
-          p: 3,
-        }}
-      >
+      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>
         {messages.map((m, i) => (
           <Box
             key={i}
@@ -60,8 +56,9 @@ export default function Chat() {
             fullWidth
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ask something..."
+            placeholder="Ask about the document..."
           />
+
           <Button variant="contained" onClick={ask}>
             Send
           </Button>

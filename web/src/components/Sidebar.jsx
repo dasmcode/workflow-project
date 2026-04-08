@@ -20,7 +20,7 @@ export default function Sidebar() {
 
   const loadFiles = async () => {
     const res = await getFiles();
-    setFiles(res.data.files); 
+    setFiles(res.data.files);
   };
 
   const handleUpload = async (e) => {
@@ -68,7 +68,7 @@ export default function Sidebar() {
           >
             <ListItemText
               primary={f.filename}
-              secondary={f.file_id.slice(0, 6)}
+              secondary={`ID: ${f.file_id.slice(0, 8)}`}
             />
           </ListItemButton>
         ))}
