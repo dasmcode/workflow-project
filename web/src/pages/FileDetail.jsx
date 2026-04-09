@@ -27,7 +27,7 @@ export default function FileDetail() {
 
   useEffect(() => {
     loadJobs();
-  }, []);
+  }, [fileId]);
 
   const loadJobs = async () => {
     const res = await getJobs();

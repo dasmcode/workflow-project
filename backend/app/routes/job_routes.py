@@ -4,8 +4,9 @@ from fastapi.responses import JSONResponse
 from app.core.database import get_db
 from app.models.jobs import JobStatus, Job
 from app.services.retrieval import query_rag
-from app.models.request_payloads import QueryRequest
+from app.models.request_payloads import JobPayload, QueryRequest, FilePayload
 from app.services.job_state import transition_job
+from app.services.delete_job_service import delete_jobs
 
 router = APIRouter()
 
@@ -55,10 +56,10 @@ def get_all_jobs(db: Session = Depends(get_db)):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@router.post("/cancel-job/{job_id}")
-def cancel_job(job_id: str, db: Session = Depends(get_db)):
+@router.post("/cancel-job/")
+def cancel_job(job_id: JobPayload, db: Session = Depends(get_db)):
     try:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_id.job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
         if job.status in [JobStatus.completed, JobStatus.failed, JobStatus.cancelled]:
@@ -78,16 +79,15 @@ def cancel_job(job_id: str, db: Session = Depends(get_db)):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@router.delete("/delete-job/{job_id}")
-def delete_job(job_id: str, db: Session = Depends(get_db)):
+@router.delete("/delete-job/")
+def delete_job(job_id: JobPayload, db: Session = Depends(get_db)):
     try:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == job_id.job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        db.delete(job)
-        db.commit()
+        delete_jobs([job])
         return JSONResponse(
-            content={"message": f"Job with ID {job_id} deleted successfully"},
+            content={"message": f"Job with ID {job_id.job_id} deleted successfully"},
             status_code=200,
         )
     except Exception as e:
@@ -96,13 +96,14 @@ def delete_job(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/delete-all-jobs/")
-def delete_all_jobs(db: Session = Depends(get_db)):
+def delete_all_jobs(file_id: FilePayload, db: Session = Depends(get_db)):
     try:
-        num_deleted = db.query(Job).delete()
-        db.commit()
+        num_deleted = db.query(Job).filter(Job.file_id == file_id.file_id).all()
+        job_ids = [str(job.id) for job in num_deleted]
+        delete_jobs(job_ids)
         return JSONResponse(
             content={
-                "message": f"All jobs deleted successfully. Total deleted: {num_deleted}"
+                "message": f"All jobs deleted successfully. Total deleted: {len(num_deleted)}"
             },
             status_code=200,
         )
@@ -111,13 +112,13 @@ def delete_all_jobs(db: Session = Depends(get_db)):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@router.post("/query-job/{job_id}")
-def query_job(job_id: str, query: QueryRequest, db: Session = Depends(get_db)):
+@router.post("/query-job/")
+def query_job(request: QueryRequest, db: Session = Depends(get_db)):
     try:
-        job = db.query(Job).filter(Job.id == job_id).first()
+        job = db.query(Job).filter(Job.id == request.job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        answer = query_rag(job, query.query)
+        answer = query_rag(job, request.query)
         return JSONResponse(content={"answer": answer}, status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)

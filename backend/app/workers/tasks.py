@@ -43,7 +43,9 @@ def process_step(job_id: str):
         if check_cancel(db, job):
             logger.info(f"Job with ID {job_id} has been cancelled after step execution")
             return
-
+        if job.status == JobStatus.failed:
+            logger.error(f"Job with ID {job_id} failed during step execution")
+            return
         job.step_index += 1
         db.commit()
         db.refresh(job)

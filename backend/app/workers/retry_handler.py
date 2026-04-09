@@ -22,7 +22,8 @@ def run_with_retry(step_func, job: Job, step_name):
 
         except Exception as e:
             job.retry_count += 1
-            transition_job(job, JobStatus.retrying)
+            if job.status != JobStatus.retrying:
+                transition_job(job, JobStatus.retrying)
             job.error_message = str(e)
 
             db.commit()

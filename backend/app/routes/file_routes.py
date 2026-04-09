@@ -6,6 +6,9 @@ from app.core.database import get_db
 from sqlalchemy.orm import Session
 from app.utils.file_handler import save_file
 from app.models.files import Files
+from app.models.jobs import Job
+from app.models.request_payloads import FilePayload
+from app.services.delete_job_service import delete_jobs
 router = APIRouter()
 
 @router.post("/upload-file/")
@@ -41,18 +44,21 @@ def get_all_files(db:Session = Depends(get_db)):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     
-@router.delete("/delete-file/{file_id}")
-def delete_file(file_id:str, db:Session = Depends(get_db)):
+@router.delete("/delete-file/")
+def delete_file(file_id: FilePayload, db:Session = Depends(get_db)):
     try:
-        file = db.query(Files).filter(Files.id == file_id).first()
+        file = db.query(Files).filter(Files.id == file_id.file_id).first()
+        if not file:
+            return JSONResponse(content={"error": "File not found"}, status_code=404)
+        jobs = db.query(Job).filter(Job.file_id == file_id.file_id).all()
+        job_ids = [str(job.id) for job in jobs]
+        delete_jobs(job_ids)
         file_path = file.filepath
         if os.path.exists(file_path):
             os.remove(file_path)
-        if not file:
-            return JSONResponse(content={"error": "File not found"}, status_code=404)
         db.delete(file)
         db.commit()
-        return JSONResponse(content={"message": f"File with ID {file_id} deleted successfully"}, status_code=200)
+        return JSONResponse(content={"message": f"File with ID {file_id.file_id} deleted successfully"}, status_code=200)
     except Exception as e:
         db.rollback()
         return JSONResponse(content={"error": str(e)}, status_code=500)

@@ -25,18 +25,34 @@ def get_embeddings(job:Job,chunks:list[str]):
         return False
     finally:
         db.close()
+        
+        
+def delete_existing_vectors(job_id:str):
+    qdrant_client.delete(
+        collection_name=QDRANT_COLLECTION,
+        points_selector=Filter(
+            must=[
+                FieldCondition(
+                    key="job_id",
+                    match=MatchValue(value=str(job_id))
+                )
+            ]
+        )
+    )
 
 def store_embeddings(job:Job, chunks:list[str], embeddings:list[list[float]]):
+    delete_existing_vectors(str(job.id))
     points = []
     db = SessionLocal()
-    for chunk, embedding in zip(chunks, embeddings):
+    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
         if check_cancel(db, job):
             logger.info(f"Job with id {job.id} has been cancelled")
             return False
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{job.id}_{i}"))
         point = PointStruct(
-            id=str(uuid.uuid4()),
+            id=point_id,
             vector=embedding,
-            payload={"text": chunk, "job_id": job.id}
+            payload={"text": chunk, "job_id": str(job.id)}
         )
         points.append(point)
     qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=points)
