@@ -4,61 +4,142 @@ from app.core.openai_client import client
 from app.services.cancel_service import check_cancel
 from app.core.database import SessionLocal
 import logging
+
 logger = logging.getLogger(__name__)
 
-def call_llm_with_context(user_prompt:str, system_prompt:str):
+
+def call_llm_with_context(user_prompt: str, system_prompt: str):
     response = client.chat.completions.create(
         model="gpt-5.4-mini",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ],
     )
     return response.choices[0].message.content.strip()
 
-def query_rag(job:Job, query:str = ""):
+
+def call_llm_with_context_streaming(user_prompt: str, system_prompt: str):
+    response = client.chat.completions.create(
+        model="gpt-5.4-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        stream=True,
+    )
+    for chunk in response:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
+def stream_response(job: Job, query: str = ""):
     try:
         db = SessionLocal()
         if check_cancel(db, job):
-            logger.info(f"Job with id {job.id} has been cancelled")
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
             return False
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input = query
-        )
+        response = client.embeddings.create(model="text-embedding-3-small", input=query)
         query_embedding = response.data[0].embedding
         if check_cancel(db, job):
-            logger.info(f"Job with id {job.id} has been cancelled")
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return False
+        relevant_chunks = search_similar(job, query_embedding)
+        context = "\n".join(relevant_chunks)
+        prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
+        system_prompt = "You are a helpful assistant that answers questions based on the provided context."
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return False
+        for chunk in call_llm_with_context_streaming(prompt, system_prompt):
+            yield chunk
+    except Exception as e:
+        job_id = str(job.id) if hasattr(job, "id") else "unknown"
+        logger.error(
+            f"Streaming error: {str(e)}",
+            extra={"job_id": job_id, "step_name": "query"},
+        )
+        yield f"[ERROR: {str(e)}]"
+
+
+def query_rag(job: Job, query: str = ""):
+    try:
+        db = SessionLocal()
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return False
+        response = client.embeddings.create(model="text-embedding-3-small", input=query)
+        query_embedding = response.data[0].embedding
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
             return False
 
         relevant_chunks = search_similar(job, query_embedding)
         if check_cancel(db, job):
-            logger.info(f"Job with id {job.id} has been cancelled")
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
             return False
 
         context = "\n".join(relevant_chunks)
         prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         system_prompt = "You are a helpful assistant that answers questions based on the provided context."
         answer = call_llm_with_context(prompt, system_prompt)
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return False
         return answer
     except Exception as e:
-        logger.error(f"Error during RAG query for job ID {job.id}: {str(e)}")
+        logger.error(
+            f"Error during RAG query for job ID {job.id}: {str(e)}",
+            extra={"job_id": str(job.id), "step_name": "query"},
+        )
         return False
 
 
-def query_summarize(job: Job, query: str = "Summarize this document", context: str = ""):
+def query_summarize(
+    job: Job, query: str = "Summarize this document", context: str = ""
+):
     try:
         db = SessionLocal()
         if check_cancel(db, job):
-            logger.info(f"Job with id {job.id} has been cancelled")
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "summarize"},
+            )
             return False
         prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         system_prompt = "You are a helpful assistant that answers questions based on the provided context."
         answer = call_llm_with_context(prompt, system_prompt)
         if check_cancel(db, job):
-            logger.info(f"Job with id {job.id} has been cancelled")
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "summarize"},
+            )
             return False
         return answer
     except Exception as e:
-        logger.error(f"Error during summarize query for job ID {job.id}: {str(e)}")
+        logger.error(
+            f"Error during summarize query for job ID {job.id}: {str(e)}",
+            extra={"job_id": str(job.id), "step_name": "summarize"},
+        )
         return False

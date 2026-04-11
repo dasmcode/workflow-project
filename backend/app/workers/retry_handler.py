@@ -13,7 +13,7 @@ def run_with_retry(step_func, job: Job, step_name):
     while job.retry_count < max_retries:
         try:
             db = SessionLocal()
-            logger.info(f"Running step {step_name} (attempt {job.retry_count+1})")
+            logger.info(f"Running step {step_name} (attempt {job.retry_count+1})",extra={"job_id": str(job.id), "step_name": step_name})
             result = step_func()
             if job.status == JobStatus.retrying:
                 transition_job(job, JobStatus.processing)
@@ -31,7 +31,7 @@ def run_with_retry(step_func, job: Job, step_name):
             logger.error(f"Step {step_name} failed: {e}")
 
             if job.retry_count >= max_retries:
-                logger.warning(f"Step {step_name} failed after {max_retries} attempts. Marking job as failed.")
+                logger.warning(f"Step {step_name} failed after {max_retries} attempts. Marking job as failed.",extra={"job_id": str(job.id), "step_name": step_name})
                 transition_job(job, JobStatus.failed)
                 db.commit()
                 return

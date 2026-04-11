@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from app.core.database import get_db
 from app.models.jobs import JobStatus, Job
-from app.services.retrieval import query_rag
+from app.services.retrieval import stream_response
 from app.models.request_payloads import JobPayload, QueryRequest, FilePayload
 from app.services.job_state import transition_job
 from app.services.delete_job_service import delete_jobs
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -118,7 +120,9 @@ def query_job(request: QueryRequest, db: Session = Depends(get_db)):
         job = db.query(Job).filter(Job.id == request.job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        answer = query_rag(job, request.query)
-        return JSONResponse(content={"answer": answer}, status_code=200)
+
+        return StreamingResponse(
+            stream_response(job, request.query), media_type="text/event-stream"
+        )
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)

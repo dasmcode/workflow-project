@@ -10,13 +10,13 @@ def delete_jobs(job_ids:list[str]):
         for job_id in job_ids:
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
-                logger.info(f"Deleting job with ID: {job_id}")
+                logger.info(f"Deleting job with ID: {job_id}",extra={"job_id": job_id})
                 delete_existing_vectors(str(job.id))
                 db.delete(job)
         db.commit()
-        logger.info(f"Deleted jobs with IDs: {', '.join(job_ids)}")
+        logger.info(f"Deleted jobs with IDs: {', '.join(job_ids)}",extra={"job_id": job_id})
     except Exception as e:
         db.rollback()
-        logger.error(f"Error deleting jobs: {str(e)}")
+        logger.error(f"Error deleting jobs: {str(e)}",extra={"job_id": job_id})
     finally:
         db.close()

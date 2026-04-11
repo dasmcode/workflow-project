@@ -14,20 +14,21 @@ def get_embeddings(job:Job,chunks:list[str]):
     try:
         for chunk in chunks:
             if check_cancel(db, job):
-                logger.info(f"Job with id {job.id} has been cancelled")
+                logger.info(f"Job with id {job.id} has been cancelled",extra={"job_id": str(job.id), "step_name": "embed_and_store"})
                 return False
             response = client.embeddings.create(input=chunk, model="text-embedding-3-small")
             embedding = response.data[0].embedding
             embeddings.append(embedding)
         return embeddings
     except Exception as e:
-        logger.error(f"Error getting embeddings for job ID {job.id}: {str(e)}")
+        logger.error(f"Error getting embeddings for job ID {job.id}: {str(e)}",extra={"job_id": str(job.id), "step_name": "embed_and_store"})
         return False
     finally:
         db.close()
         
         
 def delete_existing_vectors(job_id:str):
+    logger.info(f"Deleting existing vectors for job ID: {job_id}",extra={"job_id": job_id, "step_name": "embed_and_store"})
     qdrant_client.delete(
         collection_name=QDRANT_COLLECTION,
         points_selector=Filter(
@@ -46,7 +47,7 @@ def store_embeddings(job:Job, chunks:list[str], embeddings:list[list[float]]):
     db = SessionLocal()
     for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
         if check_cancel(db, job):
-            logger.info(f"Job with id {job.id} has been cancelled")
+            logger.info(f"Job with id {job.id} has been cancelled",extra={"job_id": str(job.id), "step_name": "embed_and_store"})
             return False
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{job.id}_{i}"))
         point = PointStruct(

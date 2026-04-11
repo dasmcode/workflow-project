@@ -33,14 +33,14 @@ def chunk_text(job:Job,text:str,chunk_size = 500, overlap = 80):
         chunks = []
         for i in range(0, len(tokens), chunk_size - overlap):
             if check_cancel(db, job):
-                logger.info(f"Job with id {job.id} has been cancelled")
+                logger.info(f"Job with id {job.id} has been cancelled",extra={"job_id": str(job.id), "step_name": "chunk"})
                 return False
             chunk_tokens = tokens[i : i + chunk_size]
             chunk_text = encoding.decode(chunk_tokens)
             chunks.append(chunk_text)
         return chunks
     except Exception as e:
-        logger.error(f"Error occurred while chunking text for job ID {job.id}: {str(e)}")
+        logger.error(f"Error occurred while chunking text for job ID {job.id}: {str(e)}",extra={"job_id": str(job.id), "step_name": "chunk"})
         return False
     finally:
         db.close()

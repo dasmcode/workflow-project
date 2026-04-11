@@ -3,7 +3,9 @@ import Sidebar from "./Sidebar";
 
 export default function Layout({ children }) {
   return (
-    <Box sx={{ display: "flex", height: "100vh", backgroundColor: "#f4f6f8" }}>
+    <Box
+      sx={{ display: "flex", minHeight: "100vh", backgroundColor: "#eef3f8" }}
+    >
       <Sidebar />
 
       <Box
@@ -16,11 +18,12 @@ export default function Layout({ children }) {
       >
         <Box
           sx={{
-            borderBottom: "1px solid #ddd",
+            borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
             px: 4,
-            py: 2,
-            background: "#fff",
-            fontWeight: 600,
+            py: 3,
+            background: "#ffffff",
+            boxShadow: "0 1px 6px rgba(15, 23, 42, 0.05)",
+            fontWeight: 700,
             fontSize: "18px",
           }}
         >
@@ -32,7 +35,7 @@ export default function Layout({ children }) {
             flex: 1,
             overflow: "auto",
             p: 4,
-            maxWidth: 1100,
+            maxWidth: 1200,
             width: "100%",
             margin: "0 auto",
           }}
