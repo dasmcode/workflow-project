@@ -1,4 +1,4 @@
-uvicorn
+uvicorn[standard]
 pandas
 numpy
 pydantic
@@ -13,3 +13,4 @@ openai
 tiktoken
 qdrant-client
 pymupdf
+strawberry-graphql[fastapi]

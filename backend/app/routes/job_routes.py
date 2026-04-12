@@ -87,7 +87,7 @@ def delete_job(job_id: JobPayload, db: Session = Depends(get_db)):
         job = db.query(Job).filter(Job.id == job_id.job_id).first()
         if not job:
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
-        delete_jobs([job])
+        delete_jobs([job_id.job_id])
         return JSONResponse(
             content={"message": f"Job with ID {job_id.job_id} deleted successfully"},
             status_code=200,

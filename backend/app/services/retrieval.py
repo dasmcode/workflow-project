@@ -33,6 +33,44 @@ def call_llm_with_context_streaming(user_prompt: str, system_prompt: str):
             yield chunk.choices[0].delta.content
 
 
+async def stream_response_async(job: Job, query: str = ""):
+    try:
+        db = SessionLocal()
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return
+        response = client.embeddings.create(model="text-embedding-3-small", input=query)
+        query_embedding = response.data[0].embedding
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return
+        relevant_chunks = search_similar(job, query_embedding)
+        context = "\n".join(relevant_chunks)
+        prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
+        system_prompt = "You are a helpful assistant that answers questions based on the provided context."
+        if check_cancel(db, job):
+            logger.info(
+                f"Job with id {job.id} has been cancelled",
+                extra={"job_id": str(job.id), "step_name": "query"},
+            )
+            return
+        for chunk in call_llm_with_context_streaming(prompt, system_prompt):
+            yield chunk
+    except Exception as e:
+        job_id = str(job.id) if hasattr(job, "id") else "unknown"
+        logger.error(
+            f"Streaming error: {str(e)}",
+            extra={"job_id": job_id, "step_name": "query"},
+        )
+        yield f"[ERROR: {str(e)}]"
+
+
 def stream_response(job: Job, query: str = ""):
     try:
         db = SessionLocal()
