@@ -5,11 +5,11 @@ from graphql_app.types.gql_types import JobType
 from app.services.delete_job_service import delete_jobs
 from app.services.retrieval import stream_response_async
 from app.services.job_state import transition_job
-from app.core import queue
+from app.core.queue import queue
 from app.models.files import Files
 from app.workers.tasks import process_step
 from graphql_app.types.gql_types import return_job
-from typing import Union
+from typing import AsyncGenerator, Union
 
 
 @strawberry.type
@@ -25,17 +25,20 @@ class JobErrorResponse:
 @strawberry.type
 class JobQuery:
     @strawberry.field
-    def job(self, info: strawberry.Info, job_id: UUID) -> JobType:
-        db = info.context.db
-        job = db.query(Job).filter(Job.id == job_id).first()
-        if not job:
-            raise Exception("Job not found")
-        return return_job(job)
+    def job(self, info: strawberry.Info, job_id: UUID) -> Union[JobType, JobErrorResponse]:
+        try:
+            db = info.context.db
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if not job:
+                raise Exception("Job not found")
+            return return_job(job)
+        except Exception as e:
+            return JobErrorResponse(error=str(e))
 
     @strawberry.field
-    def jobs(self, info: strawberry.Info) -> list[JobType]:
+    def jobs(self, info: strawberry.Info, file_id: UUID) -> list[JobType]:
         db = info.context.db
-        jobs = db.query(Job).all()
+        jobs = db.query(Job).filter(Job.file_id == str(file_id)).all()
         return [return_job(job) for job in jobs]
 
 
@@ -43,7 +46,7 @@ class JobQuery:
 class JobMutation:
     @strawberry.mutation
     def execute_workflow(
-        self, info: strawberry.Info, file_id: str, workflow_type: str
+        self, info: strawberry.Info, file_id: UUID, workflow_type: str
     ) -> Union[JobSuccessResponse, JobErrorResponse]:
         try:
             db = info.context.db
@@ -53,17 +56,15 @@ class JobMutation:
             existing_job = (
                 db.query(Job)
                 .filter(
-                    Job.file_id == file_id,
+                    Job.file_id == str(file_id),
                     Job.workflow_type == workflow_type,
                     Job.status == JobStatus.completed,
                 )
                 .first()
             )
             if existing_job:
-                return JobErrorResponse(
-                    error="A completed job for this file and workflow already exists"
-                )
-            job = Job(file_id=file_id, workflow_type=workflow_type)
+                return JobErrorResponse(error="Workflow already exists on this file")
+            job = Job(file_id=str(file_id), workflow_type=workflow_type)
             db.add(job)
             db.commit()
             db.refresh(job)
@@ -94,23 +95,23 @@ class JobMutation:
             transition_job(job, JobStatus.cancel_requested)
             db.commit()
             return JobSuccessResponse(
-                message=f"Cancel request submitted for job with ID {job_id}"
+                message=f"Cancel request submitted for jobtype {job.workflow_type}"
             )
         except Exception as e:
             return JobErrorResponse(error=str(e))
 
     @strawberry.mutation
-    def delete_job(
-        self, info: strawberry.Info, job_id: UUID
+    def delete_jobs(
+        self, info: strawberry.Info, job_ids: list[UUID]
     ) -> Union[JobSuccessResponse, JobErrorResponse]:
         try:
             db = info.context.db
-            job = db.query(Job).filter(Job.id == job_id).first()
-            if not job:
+            jobs = db.query(Job).filter(Job.id.in_(job_ids)).all()
+            if not jobs:
                 raise Exception("Job not found")
-            delete_jobs([str(job_id)])
+            delete_jobs([str(job_id) for job_id in job_ids])
             return JobSuccessResponse(
-                message=f"Job with ID {job_id} deleted successfully"
+                message=f"Jobs with IDs {job_ids} deleted successfully"
             )
         except Exception as e:
             return JobErrorResponse(error=str(e))
@@ -119,7 +120,7 @@ class JobMutation:
 @strawberry.type
 class JobSubscription:
     @strawberry.subscription
-    async def query_job(self, info: strawberry.Info, job_id: UUID, query: str) -> str:
+    async def query_job(self, info: strawberry.Info, job_id: UUID, query: str) -> AsyncGenerator[str, None]:
         db = info.context.db
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:

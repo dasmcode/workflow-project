@@ -8,6 +8,8 @@ from app.models.files import Files
 from app.models.jobs import Job
 from app.models.request_payloads import FilePayload
 from app.services.delete_job_service import delete_jobs
+import logging
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/upload-file/")
@@ -50,8 +52,11 @@ def delete_file(file_id: FilePayload, db:Session = Depends(get_db)):
         if not file:
             return JSONResponse(content={"error": "File not found"}, status_code=404)
         jobs = db.query(Job).filter(Job.file_id == file_id.file_id).all()
-        job_ids = [str(job.id) for job in jobs]
-        delete_jobs(job_ids)
+        if jobs:
+            job_ids = [str(job.id) for job in jobs]
+            delete_jobs(job_ids)
+        else:
+            logger.info(f"No jobs found for file with ID: {file_id.file_id}",extra={"job_id": None})
         file_path = file.filepath
         if os.path.exists(file_path):
             os.remove(file_path)

@@ -8,29 +8,29 @@ import {
   Divider,
 } from "@mui/material";
 import { useEffect, useState } from "react";
-import { getFiles, uploadFile } from "../api/api";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useMutation, useQuery } from "@apollo/client/react";
+import { GET_FILES,UPLOAD_FILE } from "../queries/file_queries";
 
 export default function Sidebar() {
   const [files, setFiles] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: Files, refetch } = useQuery(GET_FILES);
+  const [uploadFileMutation] = useMutation(UPLOAD_FILE);
 
   useEffect(() => {
-    loadFiles();
-  }, []);
-
-  const loadFiles = async () => {
-    const res = await getFiles();
-    setFiles(res.data.files);
-  };
+    if (Files?.files) {
+      setFiles(Files.files);
+    }
+  }, [Files]);
 
   const handleUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    await uploadFile(file);
-    loadFiles();
+    await uploadFileMutation({ variables: { uploadedFile: file } });
+    refetch();
   };
 
   return (
@@ -75,14 +75,14 @@ export default function Sidebar() {
 
         {files.map((f) => (
           <ListItemButton
-            key={f.file_id}
-            onClick={() => navigate(`/file/${f.file_id}`)}
-            selected={location.pathname === `/file/${f.file_id}`}
+            key={f.id}
+            onClick={() => navigate(`/file/${f.id}`)}
+            selected={location.pathname === `/file/${f.id}`}
             sx={{
               borderRadius: 2,
               mb: 1,
               backgroundColor:
-                location.pathname === `/file/${f.file_id}`
+                location.pathname === `/file/${f.id}`
                   ? "rgba(255,255,255,0.08)"
                   : "transparent",
               "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
@@ -90,11 +90,10 @@ export default function Sidebar() {
           >
             <ListItemText
               primary={f.filename}
-              secondary={`ID: ${f.file_id.slice(0, 8)}`}
-              primaryTypographyProps={{ noWrap: true }}
-              secondaryTypographyProps={{
-                color: "rgba(255,255,255,0.72)",
-                fontSize: 12,
+              secondary={`ID: ${f.id.slice(0, 8)}`}
+              slotProps={{
+                primary: { noWrap: true },
+                secondary: { color: "rgba(255,255,255,0.72)", fontSize: 12 },
               }}
             />
           </ListItemButton>

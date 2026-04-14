@@ -1,10 +1,9 @@
 import Layout from "../components/Layout";
 import { useParams } from "react-router-dom";
 import { useState } from "react";
-import { queryJobStream } from "../api/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
+import { QUERY_RAG } from "../queries/job_queries";
 import {
   Box,
   TextField,
@@ -14,16 +13,27 @@ import {
   Stack,
   CircularProgress,
 } from "@mui/material";
+import { useApolloClient } from "@apollo/client/react";
 
 export default function Chat() {
   const { jobId } = useParams();
-
+  const client = useApolloClient();
   const [q, setQ] = useState("");
   const [messages, setMessages] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const createId = () =>
     `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const handleError = (id, message) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === id
+          ? { ...msg, text: message, error: true, loading: false }
+          : msg,
+      ),
+    );
+  };
 
   const ask = async () => {
     const trimmed = q.trim();
@@ -41,29 +51,32 @@ export default function Chat() {
     setQ("");
     setIsStreaming(true);
 
-    try {
-      await queryJobStream(jobId, trimmed, (chunk) => {
+    const observable = client.subscribe({
+      query: QUERY_RAG,
+      variables: { jobId, query: trimmed },
+    });
+
+    const subscription = observable.subscribe({
+      next: ({ data }) => {
+        const chunk = data.queryJob;
+        // Update the bot message with the new chunk
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === botMessage.id ? { ...msg, text: msg.text + chunk } : msg,
+            msg.id === botMessage.id
+              ? { ...msg, text: msg.text + chunk, loading: false }
+              : msg,
           ),
         );
-      });
-    } catch (error) {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === botMessage.id
-            ? {
-                ...msg,
-                text: error?.message || "Unable to retrieve answer.",
-                error: true,
-              }
-            : msg,
-        ),
-      );
-    } finally {
-      setIsStreaming(false);
-    }
+      },
+      error: (err) => {
+        handleError(botMessage.id, err.message);
+        setIsStreaming(false);
+      },
+      complete: () => {
+        setIsStreaming(false);
+      },
+    });
+    
   };
 
   const handleKeyDown = (event) => {

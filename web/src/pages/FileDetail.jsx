@@ -1,13 +1,6 @@
 import Layout from "../components/Layout";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import {
-  executeWorkflow,
-  getJobs,
-  cancelJob,
-  deleteJob,
-  deleteFile,
-} from "../api/api";
 
 import {
   Button,
@@ -22,8 +15,17 @@ import {
   Alert,
   Grid,
 } from "@mui/material";
+import { useMutation, useQuery } from "@apollo/client/react";
+import { DELETE_FILE } from "../queries/file_queries";
+import {
+  GET_JOBS_BY_FILE_ID,
+  EXECUTE_JOB,
+  CANCEL_JOB,
+  DELETE_JOB,
+} from "../queries/job_queries";
 
 export default function FileDetail() {
+  const navigate = useNavigate();
   const { fileId } = useParams();
 
   const [jobs, setJobs] = useState([]);
@@ -33,15 +35,21 @@ export default function FileDetail() {
   const [alertSeverity, setAlertSeverity] = useState("success");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
+  const [deleteFileMutation] = useMutation(DELETE_FILE);
+  const [executeWorkflowMutation] = useMutation(EXECUTE_JOB);
+  const [cancelJobMutation] = useMutation(CANCEL_JOB);
+  const [deleteJobMutation] = useMutation(DELETE_JOB);
+  const { data: JobsData, refetch } = useQuery(GET_JOBS_BY_FILE_ID, {
+    variables: { fileId },
+  });
+
   useEffect(() => {
     loadJobs();
-  }, [fileId]);
+  }, [JobsData]);
 
   const loadJobs = async () => {
     setLoading(true);
-    const res = await getJobs();
-    const filtered = res.data.jobs.filter((j) => j.file_id === fileId);
-    setJobs(filtered);
+    setJobs(JobsData?.jobs || []);
     setLoading(false);
   };
 
@@ -49,11 +57,20 @@ export default function FileDetail() {
     setActionLoading(true);
 
     try {
-      const res = await executeWorkflow(fileId, type);
+      const response = await executeWorkflowMutation({
+        variables: {
+          fileId,
+          workflowType: type,
+        },
+      });
+      console.log("Execute workflow response data:", response);
+      const responseData = response.data.executeWorkflow;
+      if (responseData?.error) {
+        throw new Error(responseData.error);
+      }
       setAlertSeverity("success");
-      setAlertMessage(res?.data?.message || `Started ${type} workflow`);
+      setAlertMessage(responseData?.message || `Started ${type} workflow`);
       setSnackbarOpen(true);
-      await loadJobs();
     } catch (error) {
       const message =
         error?.response?.data?.error ||
@@ -63,6 +80,7 @@ export default function FileDetail() {
       setAlertMessage(message);
       setSnackbarOpen(true);
     } finally {
+      await refetch();
       setActionLoading(false);
     }
   };
@@ -73,17 +91,61 @@ export default function FileDetail() {
   };
 
   const cancelJobHandler = async (jobId) => {
-    await cancelJob(jobId);
-    loadJobs();
+    setActionLoading(true);
+    try {
+      const response = await cancelJobMutation({
+        variables: { jobId },
+      });
+      const responseData = response.data.cancelJob;
+      if (responseData?.error) {
+        throw new Error(responseData.error);
+      }
+      setAlertSeverity("info");
+      setAlertMessage(responseData?.message || `Job cancelled successfully`);
+      setSnackbarOpen(true);
+    } catch (error) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        "Unable to cancel job";
+      setAlertSeverity("error");
+      setAlertMessage(message);
+      setSnackbarOpen(true);
+    } finally {
+      await refetch();
+      setActionLoading(false);
+    }
   };
 
-  const deleteJobHandler = async (jobId) => {
-    await deleteJob(jobId);
-    loadJobs();
+  const deleteJobHandler = async (jobIds) => {
+    setActionLoading(true);
+    try {
+      const response = await deleteJobMutation({
+        variables: { jobIds },
+      });
+      const responseData = response.data.deleteJob;
+      if (responseData?.error) {
+        throw new Error(responseData.error);
+      }
+      setAlertSeverity("info");
+      setAlertMessage(responseData?.message || `Job deleted successfully`);
+      setSnackbarOpen(true);
+    } catch (error) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        "Unable to delete job";
+      setAlertSeverity("error");
+      setAlertMessage(message);
+      setSnackbarOpen(true);
+    } finally {
+      await refetch();
+      setActionLoading(false);
+    }
   };
 
   const deleteFileHandler = async () => {
-    await deleteFile(fileId);
+    deleteFileMutation({ variables: { fileId } });
     window.location.href = "/";
   };
 
@@ -164,7 +226,7 @@ export default function FileDetail() {
       <Stack spacing={3}>
         {jobs.map((job) => (
           <Card
-            key={job.job_id}
+            key={job.id}
             sx={{
               mb: 0,
               borderRadius: 3,
@@ -189,7 +251,7 @@ export default function FileDetail() {
               >
                 <Stack spacing={1} sx={{ minWidth: 0 }}>
                   <Typography variant="h6">
-                    {job.workflow_type.toUpperCase()}
+                    {job.workflowType.toUpperCase()}
                   </Typography>
                   <Chip
                     label={job.status}
@@ -205,7 +267,7 @@ export default function FileDetail() {
                     size="small"
                   />
                   <Typography color="text.secondary" sx={{ mt: 1 }}>
-                    {job.workflow_type === "summarization"
+                    {job.workflowType === "summarization"
                       ? "Summary is available on the summary page once processing completes."
                       : "Open the chat after completion to interact with the RAG workflow."}
                   </Typography>
@@ -217,21 +279,21 @@ export default function FileDetail() {
                   flexWrap="wrap"
                   justifyContent="flex-end"
                 >
-                  {job.workflow_type === "rag" && (
+                  {job.workflowType === "rag" && (
                     <Button
                       variant="contained"
-                      href={`/workflow/v1/chat/${job.job_id}`}
                       size="small"
+                      onClick={() => navigate(`/chat/${job.id}`)}
                     >
                       Open Chat
                     </Button>
                   )}
 
-                  {job.workflow_type === "summarization" && (
+                  {job.workflowType === "summarization" && (
                     <Button
                       variant="outlined"
-                      href={`/workflow/v1/summary/${job.job_id}`}
                       size="small"
+                      onClick={() => navigate(`/summary/${job.id}`)}
                     >
                       View Summary
                     </Button>
@@ -242,7 +304,7 @@ export default function FileDetail() {
                       color="warning"
                       variant="outlined"
                       size="small"
-                      onClick={() => cancelJobHandler(job.job_id)}
+                      onClick={() => cancelJobHandler(job.id)}
                     >
                       Cancel
                     </Button>
@@ -252,7 +314,7 @@ export default function FileDetail() {
                     color="error"
                     variant="outlined"
                     size="small"
-                    onClick={() => deleteJobHandler(job.job_id)}
+                    onClick={() => deleteJobHandler([job.id])}
                   >
                     Delete
                   </Button>

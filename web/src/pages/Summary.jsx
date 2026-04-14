@@ -1,7 +1,6 @@
 import Layout from "../components/Layout";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getJobStatus } from "../api/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -12,19 +11,22 @@ import {
   CircularProgress,
   Box,
 } from "@mui/material";
+import { useQuery } from "@apollo/client/react";
+import { GET_JOB } from "../queries/job_queries";
 
 export default function Summary() {
   const { jobId } = useParams();
-
+  const {data:JobData,refetch } = useQuery(GET_JOB, {
+    variables: { jobId },
+  })
   const [job, setJob] = useState(null);
 
   useEffect(() => {
     loadJob();
-  }, []);
+  }, [JobData]);
 
   const loadJob = async () => {
-    const res = await getJobStatus(jobId);
-    setJob(res.data);
+    setJob(JobData?.job);
   };
 
   if (!job)
