@@ -4,7 +4,9 @@ services:
       - backend
     networks:
       - app-network
-    build: ./web
+    build:
+      context: ./web
+    image: workflow-web:latest
     ports:
       - 3000:80
   backend:
@@ -14,7 +16,9 @@ services:
       - qdrant
     networks:
       - app-network
-    build: ./backend
+    build: 
+      context: ./backend
+    image: workflow-backend:latest
     ports:
       - 8000:8000
     environment:
@@ -29,7 +33,7 @@ services:
       - redis
     networks:
       - app-network
-    build: ./backend
+    image: workflow-backend:latest
     command: python -m app.workers.worker
     environment:
       POSTGRES_SERVER: postgres

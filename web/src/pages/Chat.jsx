@@ -155,7 +155,7 @@ export default function Chat() {
                       >
                         <CircularProgress size={14} sx={{ color: "inherit" }} />
                         <Typography variant="body2" component="span">
-                          Streaming...
+                          Thinking...
                         </Typography>
                       </Box>
                     ) : m.role === "user" ? (

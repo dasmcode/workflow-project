@@ -8,6 +8,40 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def rerank_chunks(query: str, chunks: list[str]):
+    joined_chunks = "\n\n".join([f"{i+1}. {chunk}" for i, chunk in enumerate(chunks)])
+
+    prompt = f"""
+You are a ranking assistant.
+
+Given a query and list of document chunks,
+rank the chunks from most relevant to least relevant.
+
+Return ONLY the indices in order (example: 3,1,2).
+
+Query:
+{query}
+
+Chunks:
+{joined_chunks}
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}]
+    )
+
+    ranking = response.choices[0].message.content.strip()
+
+    try:
+        indices = [int(x.strip()) - 1 for x in ranking.split(",")]
+    except:
+        return chunks[:5]
+
+    reranked = [chunks[i] for i in indices if i < len(chunks)]
+
+    return reranked[:5]
+
+
 def call_llm_with_context(user_prompt: str, system_prompt: str):
     response = client.chat.completions.create(
         model="gpt-5.4-mini",
@@ -50,8 +84,16 @@ async def stream_response_async(job: Job, query: str = ""):
                 extra={"job_id": str(job.id), "step_name": "query"},
             )
             return
-        relevant_chunks = search_similar(job, query_embedding)
-        context = "\n".join(relevant_chunks)
+        relevant_chunks = search_similar(job, query_embedding, 20, 0.40)
+        top_chunks = rerank_chunks(query, relevant_chunks)
+        logging.info(
+            f"Reranking completed for job ID {job.id}. Input chunks: {len(relevant_chunks)}, Output chunks: {len(top_chunks)}",
+            extra={
+                "job_id": str(job.id),
+                "step_name": "rerank",
+            },
+        )
+        context = "\n".join(top_chunks)
         prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         system_prompt = "You are a helpful assistant that answers questions based on the provided context."
         if check_cancel(db, job):

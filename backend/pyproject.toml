@@ -1,0 +1,24 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "backend server for workflow application"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.135.3",
+    "numpy>=2.4.4",
+    "openai>=2.31.0",
+    "pandas>=3.0.2",
+    "psycopg2-binary>=2.9.11",
+    "pydantic>=2.13.0",
+    "pymupdf>=1.27.2.2",
+    "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.26",
+    "qdrant-client>=1.17.1",
+    "redis>=7.4.0",
+    "rq>=2.7.0",
+    "sqlalchemy>=2.0.49",
+    "strawberry-graphql[fastapi]>=0.314.3",
+    "tiktoken>=0.12.0",
+    "uvicorn[standard]>=0.44.0",
+]

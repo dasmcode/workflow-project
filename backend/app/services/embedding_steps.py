@@ -59,7 +59,7 @@ def store_embeddings(job:Job, chunks:list[str], embeddings:list[list[float]]):
     qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=points)
     return True
     
-def search_similar(job:Job, query_embedding:list[float], top_k:int = 5):
+def search_similar(job:Job, query_embedding:list[float], top_k:int = 5, SCORE_THRESHOLD:float = 0.50):
     search_result = qdrant_client.query_points(
         collection_name=QDRANT_COLLECTION,
         query=query_embedding,
@@ -73,4 +73,4 @@ def search_similar(job:Job, query_embedding:list[float], top_k:int = 5):
         ),
         limit=top_k
     )
-    return [hit.payload["text"] for hit in search_result.points]
+    return [hit.payload["text"] for hit in search_result.points if hit.score >= SCORE_THRESHOLD]
