@@ -11,14 +11,17 @@ import UploadHttpLink from "apollo-upload-client/UploadHttpLink.mjs";
 import { createClient } from "graphql-ws";
 import { getMainDefinition } from "@apollo/client/utilities";
 
+const host = window.location.host;
+const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+
 const wsLink = new GraphQLWsLink(
   createClient({
-    url: "ws://localhost:8000/api/v1/workflow",
+    url: `${protocol}://${host}/api/v1/workflow`,
   }),
 );
 
 const httpLink = new UploadHttpLink({
-  uri: "http://localhost:8000/api/v1/workflow",
+  uri: `${window.location.protocol}//${host}/api/v1/workflow`,
 });
 
 const splitLink = ApolloLink.split(
