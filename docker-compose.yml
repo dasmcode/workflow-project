@@ -10,45 +10,51 @@ services:
     ports:
       - 3000:80
   backend:
+    env_file:
+      - ./backend/.env
     depends_on:
       - postgres
       - redis
       - qdrant
     networks:
       - app-network
-    build: 
+    build:
       context: ./backend
     image: workflow-backend:latest
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /appuser
     ports:
       - 8000:8000
-    environment:
-      POSTGRES_SERVER: postgres
-      REDIS_SERVER: redis
-      QDRANT_SERVER: qdrant
     volumes:
-      - uploads_files:/appuser/uploads
+      - uploads_files:/appuser/uploads:rw
+      - ./backend/model_cache/docling:/appuser/.cache/docling:ro
   worker:
+    env_file:
+      - ./backend/.env
     depends_on:
       - postgres
       - redis
     networks:
       - app-network
     image: workflow-backend:latest
-    command: python -m app.workers.worker
-    environment:
-      POSTGRES_SERVER: postgres
-      REDIS_SERVER: redis
-      QDRANT_SERVER: qdrant
+    command: uv run python -m app.workers.worker
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /appuser
     volumes:
       - uploads_files:/appuser/uploads
+      - ./backend/model_cache/docling:/appuser/.cache/docling:ro
   postgres:
+    env_file:
+      - ./backend/.env
     networks:
       - app-network
     image: postgres:latest
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - 5432:5432
     volumes:

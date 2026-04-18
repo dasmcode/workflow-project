@@ -76,7 +76,9 @@ async def stream_response_async(job: Job, query: str = ""):
                 extra={"job_id": str(job.id), "step_name": "query"},
             )
             return
-        response = client.embeddings.create(model="text-embedding-3-small", input=query)
+        response = client.embeddings.create(
+            model="text-embedding-3-small", input=query, dimensions=1024
+        )
         query_embedding = response.data[0].embedding
         if check_cancel(db, job):
             logger.info(
@@ -113,89 +115,6 @@ async def stream_response_async(job: Job, query: str = ""):
         yield f"[ERROR: {str(e)}]"
 
 
-def stream_response(job: Job, query: str = ""):
-    try:
-        db = SessionLocal()
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        response = client.embeddings.create(model="text-embedding-3-small", input=query)
-        query_embedding = response.data[0].embedding
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        relevant_chunks = search_similar(job, query_embedding)
-        context = "\n".join(relevant_chunks)
-        prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
-        system_prompt = "You are a helpful assistant that answers questions based on the provided context."
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        for chunk in call_llm_with_context_streaming(prompt, system_prompt):
-            yield chunk
-    except Exception as e:
-        job_id = str(job.id) if hasattr(job, "id") else "unknown"
-        logger.error(
-            f"Streaming error: {str(e)}",
-            extra={"job_id": job_id, "step_name": "query"},
-        )
-        yield f"[ERROR: {str(e)}]"
-
-
-def query_rag(job: Job, query: str = ""):
-    try:
-        db = SessionLocal()
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        response = client.embeddings.create(model="text-embedding-3-small", input=query)
-        query_embedding = response.data[0].embedding
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-
-        relevant_chunks = search_similar(job, query_embedding)
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-
-        context = "\n".join(relevant_chunks)
-        prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
-        system_prompt = "You are a helpful assistant that answers questions based on the provided context."
-        answer = call_llm_with_context(prompt, system_prompt)
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        return answer
-    except Exception as e:
-        logger.error(
-            f"Error during RAG query for job ID {job.id}: {str(e)}",
-            extra={"job_id": str(job.id), "step_name": "query"},
-        )
-        return False
-
-
 def query_summarize(
     job: Job, query: str = "Summarize this document", context: str = ""
 ):
@@ -222,4 +141,4 @@ def query_summarize(
             f"Error during summarize query for job ID {job.id}: {str(e)}",
             extra={"job_id": str(job.id), "step_name": "summarize"},
         )
-        return False
+        raise Exception(f"Error occurred during summarization: {str(e)}")
