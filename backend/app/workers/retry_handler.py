@@ -43,6 +43,11 @@ def run_with_retry(step_func, job: Job, step_name):
                 )
                 transition_job(job, JobStatus.failed)
                 db.commit()
+                db.refresh(job)
+                logger.info(
+                    f"Status of job : {job.status}",
+                    extra={"job_id": str(job.id), "step_name": step_name},
+                )
                 return
 
             time.sleep(2 * job.retry_count)

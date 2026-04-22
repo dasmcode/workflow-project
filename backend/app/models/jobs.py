@@ -1,9 +1,11 @@
 from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
-import uuid
+import uuid, os
 from datetime import datetime
 from app.core.database import Base
 from enum import Enum
+
+JOBS_TABLE = os.getenv("JOBS_TABLE", "jobs")
 
 
 def current_time():
@@ -21,7 +23,7 @@ class JobStatus(Enum):
 
 
 class Job(Base):
-    __tablename__ = "jobs"
+    __tablename__ = JOBS_TABLE
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     file_id = Column(String)

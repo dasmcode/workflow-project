@@ -2,12 +2,14 @@
 
 Cloud Native solution for users to choose from pre-defined workflows and create their own AI powered workflow designs
 
-# # How to use:
+## How to use:
 
 - First build the image in the root folder using this command
+
   ```bash
   docker build -t image-name:tag .
   ```
+
 - Place the same image-name and tag in the "FROM" section of the Dockerfile present in /backend
 - Install doc-ling models locally
   ```bash

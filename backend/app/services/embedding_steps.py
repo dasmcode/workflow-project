@@ -1,18 +1,22 @@
 from app.core.openai_client import client
 from app.core.qdrant_client import client as qdrant_client, QDRANT_COLLECTION
 from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct
-import uuid
+import uuid, os
 from app.models.jobs import Job
+from app.models.chunks import Chunks
 from app.core.database import SessionLocal
 from app.services.cancel_service import check_cancel
 import logging
 
 logger = logging.getLogger(__name__)
 
+CHUNKS_TABLE = os.getenv("CHUNKS_TABLE", "chunks")
+
 
 def get_embeddings(job: Job, chunks: list[str]):
     embeddings = []
     db = SessionLocal()
+
     try:
         for chunk in chunks:
             if check_cancel(db, job):
@@ -55,6 +59,10 @@ def store_embeddings(job: Job, chunks: list[str], embeddings: list[list[float]])
         delete_existing_vectors(str(job.id))
         points = []
         db = SessionLocal()
+        query = f"""
+        CREATE INDEX {str(job.id)}_idx ON {CHUNKS_TABLE} USING bm25(content) WITH (text_config='english') WHERE job_id='{str(job.id)}';
+        """
+        db.execute(query)
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             if check_cancel(db, job):
                 logger.info(
@@ -63,6 +71,9 @@ def store_embeddings(job: Job, chunks: list[str], embeddings: list[list[float]])
                 )
                 return False
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{job.id}_{i}"))
+            chunk = Chunks(id=point_id, content=chunk, job_id=str(job.id))
+            db.add(chunk)
+            db.commit()
             point = PointStruct(
                 id=point_id,
                 vector=embedding,
