@@ -25,7 +25,9 @@ class JobErrorResponse:
 @strawberry.type
 class JobQuery:
     @strawberry.field
-    def job(self, info: strawberry.Info, job_id: UUID) -> Union[JobType, JobErrorResponse]:
+    def job(
+        self, info: strawberry.Info, job_id: UUID
+    ) -> Union[JobType, JobErrorResponse]:
         try:
             db = info.context.db
             job = db.query(Job).filter(Job.id == job_id).first()
@@ -120,7 +122,9 @@ class JobMutation:
 @strawberry.type
 class JobSubscription:
     @strawberry.subscription
-    async def query_job(self, info: strawberry.Info, job_id: UUID, query: str) -> AsyncGenerator[str, None]:
+    async def query_job(
+        self, info: strawberry.Info, job_id: UUID, query: str
+    ) -> AsyncGenerator[str, None]:
         db = info.context.db
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
@@ -128,7 +132,7 @@ class JobSubscription:
             return
 
         try:
-            async for chunk in stream_response_async(job, query):
+            async for chunk in stream_response_async(db, job, query):
                 yield chunk
         except Exception as e:
             yield f"ERROR: {str(e)}"

@@ -122,7 +122,7 @@ def query_job(request: QueryRequest, db: Session = Depends(get_db)):
             return JSONResponse(content={"error": "Job not found"}, status_code=404)
 
         return StreamingResponse(
-            stream_response(job, request.query), media_type="text/event-stream"
+            stream_response(db, job, request.query), media_type="text/event-stream"
         )
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)

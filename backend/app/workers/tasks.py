@@ -14,18 +14,24 @@ def process_step(job_id: str):
     db = SessionLocal()
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
-        logger.info(f"Processing job with ID {job_id}, current status: {job.status}",extra={"job_id": job_id})
+        logger.info(
+            f"Processing job with ID {job_id}, current status: {job.status}",
+            extra={"job_id": job_id},
+        )
         if not job:
             logger.error(f"Job with ID {job_id} not found")
             raise Exception("Job not found")
         if check_cancel(db, job):
-            logger.info(f"Job with ID {job_id} has been cancelled",extra={"job_id": job_id})
+            logger.info(
+                f"Job with ID {job_id} has been cancelled", extra={"job_id": job_id}
+            )
             return
         workflow = WORKFLOWS.get(job.workflow_type)
 
         if not workflow:
             logger.error(
-                f"Workflow type {job.workflow_type} not found for job ID {job_id}", extra={"job_id": job_id}
+                f"Workflow type {job.workflow_type} not found for job ID {job_id}",
+                extra={"job_id": job_id},
             )
             transition_job(job, JobStatus.failed)
             db.commit()
@@ -39,12 +45,19 @@ def process_step(job_id: str):
         db.refresh(job)
 
         execute_step(current_step, job)
+        db.refresh(job)
 
         if check_cancel(db, job):
-            logger.info(f"Job with ID {job_id} has been cancelled after step execution",extra={"job_id": job_id, "step_name": current_step})
+            logger.info(
+                f"Job with ID {job_id} has been cancelled after step execution",
+                extra={"job_id": job_id, "step_name": current_step},
+            )
             return
         if job.status == JobStatus.failed:
-            logger.error(f"Job with ID {job_id} failed during step execution",extra={"job_id": job_id, "step_name": current_step})
+            logger.error(
+                f"Job with ID {job_id} failed during step execution",
+                extra={"job_id": job_id, "step_name": current_step},
+            )
             return
         job.step_index += 1
         db.commit()
@@ -54,13 +67,22 @@ def process_step(job_id: str):
             queue.enqueue(process_step, str(job.id))
         else:
             if check_cancel(db, job):
-                logger.info(f"Job with ID {job_id} has been cancelled before completion",extra={"job_id": job_id, "step_name": current_step})
+                logger.info(
+                    f"Job with ID {job_id} has been cancelled before completion",
+                    extra={"job_id": job_id, "step_name": current_step},
+                )
                 return
             transition_job(job, JobStatus.completed)
             db.commit()
-            logger.info(f"Job with ID {job_id} completed successfully",extra={"job_id": job_id, "step_name": current_step})
+            logger.info(
+                f"Job with ID {job_id} completed successfully",
+                extra={"job_id": job_id, "step_name": current_step},
+            )
     except Exception as e:
-        logger.error(f"Error processing job with ID {job_id}: {str(e)}",extra={"job_id": job_id, "step_name": current_step})
+        logger.error(
+            f"Error processing job with ID {job_id}: {str(e)}",
+            extra={"job_id": job_id, "step_name": current_step},
+        )
         transition_job(job, JobStatus.failed)
         db.commit()
     finally:

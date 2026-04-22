@@ -3,6 +3,7 @@ from app.services.embedding_steps import search_similar
 from app.core.openai_client import client
 from app.services.cancel_service import check_cancel
 from app.core.database import SessionLocal
+from sqlalchemy.orm import Session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -67,9 +68,8 @@ def call_llm_with_context_streaming(user_prompt: str, system_prompt: str):
             yield chunk.choices[0].delta.content
 
 
-async def stream_response_async(job: Job, query: str = ""):
+async def stream_response_async(db: Session, job: Job, query: str = ""):
     try:
-        db = SessionLocal()
         if check_cancel(db, job):
             logger.info(
                 f"Job with id {job.id} has been cancelled",
@@ -115,9 +115,8 @@ async def stream_response_async(job: Job, query: str = ""):
         yield f"[ERROR: {str(e)}]"
 
 
-def stream_response(job: Job, query: str = ""):
+def stream_response(db: Session, job: Job, query: str = ""):
     try:
-        db = SessionLocal()
         if check_cancel(db, job):
             logger.info(
                 f"Job with id {job.id} has been cancelled",
@@ -153,56 +152,18 @@ def stream_response(job: Job, query: str = ""):
         yield f"[ERROR: {str(e)}]"
 
 
-def query_rag(job: Job, query: str = ""):
-    try:
-        db = SessionLocal()
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        response = client.embeddings.create(model="text-embedding-3-small", input=query)
-        query_embedding = response.data[0].embedding
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-
-        relevant_chunks = search_similar(job, query_embedding)
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-
-        context = "\n".join(relevant_chunks)
-        prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
-        system_prompt = "You are a helpful assistant that answers questions based on the provided context."
-        answer = call_llm_with_context(prompt, system_prompt)
-        if check_cancel(db, job):
-            logger.info(
-                f"Job with id {job.id} has been cancelled",
-                extra={"job_id": str(job.id), "step_name": "query"},
-            )
-            return False
-        return answer
-    except Exception as e:
-        logger.error(
-            f"Error during RAG query for job ID {job.id}: {str(e)}",
-            extra={"job_id": str(job.id), "step_name": "query"},
-        )
-        return False
-
-
 def query_summarize(
-    job: Job, query: str = "Summarize this document", context: str = ""
+    job_id: str, query: str = "Summarize this document", context: str = ""
 ):
     try:
         db = SessionLocal()
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            logger.error(
+                f"Job with id {job_id} not found",
+                extra={"job_id": job_id, "step_name": "summarize"},
+            )
+            raise ValueError("Job not found")
         if check_cancel(db, job):
             logger.info(
                 f"Job with id {job.id} has been cancelled",

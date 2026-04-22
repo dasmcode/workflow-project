@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 def extract_text(job: Job):
     try:
         db = SessionLocal()
+        job = db.merge(job)
         file = db.query(Files).filter(Files.id == job.file_id).first()
         file_path = file.filepath
         if check_cancel(db, job):
@@ -55,6 +56,7 @@ def extract_text(job: Job):
 def chunk_text(job: Job, extracted_dict: dict, chunk_size=500, overlap=80):
     try:
         db = SessionLocal()
+        job = db.merge(job)
         if check_cancel(db, job):
             logger.info(
                 f"Job with id {job.id} has been cancelled",

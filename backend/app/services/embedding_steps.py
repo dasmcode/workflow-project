@@ -7,17 +7,18 @@ from app.models.chunks import Chunks
 from app.core.database import SessionLocal
 from app.services.cancel_service import check_cancel
 import logging
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
 CHUNKS_TABLE = os.getenv("CHUNKS_TABLE", "chunks")
 
 
-def get_embeddings(job: Job, chunks: list[str]):
-    embeddings = []
-    db = SessionLocal()
-
+def get_embeddings(job_id: str, chunks: list[str]):
     try:
+        embeddings = []
+        db = SessionLocal()
+        job = db.query(Job).filter(Job.id == job_id).first()
         for chunk in chunks:
             if check_cancel(db, job):
                 logger.info(
@@ -32,6 +33,7 @@ def get_embeddings(job: Job, chunks: list[str]):
             embeddings.append(embedding)
         return embeddings
     except Exception as e:
+        db.rollback()
         logger.error(
             f"Error getting embeddings for job ID {job.id}: {str(e)}",
             extra={"job_id": str(job.id), "step_name": "embed_and_store"},
@@ -49,20 +51,24 @@ def delete_existing_vectors(job_id: str):
     qdrant_client.delete(
         collection_name=QDRANT_COLLECTION,
         points_selector=Filter(
-            must=[FieldCondition(key="job_id", match=MatchValue(value=str(job_id)))]
+            must=[FieldCondition(key="job_id", match=MatchValue(value=job_id))]
         ),
     )
 
 
-def store_embeddings(job: Job, chunks: list[str], embeddings: list[list[float]]):
+def store_embeddings(job_id: str, chunks: list[str], embeddings: list[list[float]]):
     try:
-        delete_existing_vectors(str(job.id))
-        points = []
+        delete_existing_vectors(job_id)
         db = SessionLocal()
-        query = f"""
-        CREATE INDEX {str(job.id)}_idx ON {CHUNKS_TABLE} USING bm25(content) WITH (text_config='english') WHERE job_id='{str(job.id)}';
+        job = db.query(Job).filter(Job.id == job_id).first()
+        points = []
+        index_name = f"idx_{str(job.id).replace('-', '_')}"
+        query = text(
+            f"""
+        CREATE INDEX IF NOT EXISTS "{index_name}" ON "{CHUNKS_TABLE}" USING bm25(content) WITH (text_config='english') WHERE job_id=:job_id;
         """
-        db.execute(query)
+        )
+        db.execute(query, {"job_id": str(job.id)})
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             if check_cancel(db, job):
                 logger.info(
@@ -71,18 +77,19 @@ def store_embeddings(job: Job, chunks: list[str], embeddings: list[list[float]])
                 )
                 return False
             point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{job.id}_{i}"))
-            chunk = Chunks(id=point_id, content=chunk, job_id=str(job.id))
-            db.add(chunk)
-            db.commit()
+            db_chunk = Chunks(id=point_id, content=chunk, job_id=str(job.id))
+            db.add(db_chunk)
             point = PointStruct(
                 id=point_id,
                 vector=embedding,
                 payload={"text": chunk, "job_id": str(job.id)},
             )
             points.append(point)
+        db.commit()
         qdrant_client.upsert(collection_name=QDRANT_COLLECTION, points=points)
         return True
     except Exception as e:
+        db.rollback()
         logger.error(
             f"Error occurred while storing embeddings for job ID {job.id}: {str(e)}",
             extra={"job_id": str(job.id), "step_name": "embed_and_store"},

@@ -15,7 +15,7 @@ def execute_step(step_name: str, job: Job):
             f"Extracting text for job ID {job.id}",
             extra={"job_id": str(job.id), "step_name": step_name},
         )
-        text = run_with_retry(lambda: extract_text(job), job, step_name)
+        text = run_with_retry(lambda: extract_text(job), str(job.id), step_name)
         set_step_data(str(job.id), step_name, text)
 
     elif step_name == "summarize":
@@ -26,7 +26,9 @@ def execute_step(step_name: str, job: Job):
         )
         try:
             summary = run_with_retry(
-                lambda: query_summarize(job, context=text), job, step_name
+                lambda: query_summarize(str(job.id), context=text),
+                str(job.id),
+                step_name,
             )
             if not summary:
                 job.result = "Summarization failed or was cancelled"
@@ -41,7 +43,7 @@ def execute_step(step_name: str, job: Job):
 
     elif step_name == "chunk":
         text = get_step_data(str(job.id), "extract_text")
-        chunks = run_with_retry(lambda: chunk_text(job, text), job, step_name)
+        chunks = run_with_retry(lambda: chunk_text(job, text), str(job.id), step_name)
         if not chunks:
             logger.info(
                 f"Chunking failed or was cancelled for job ID {job.id}",
@@ -53,7 +55,9 @@ def execute_step(step_name: str, job: Job):
 
     elif step_name == "embed_and_store":
         chunks = get_step_data(str(job.id), "chunk")
-        embeddings = run_with_retry(lambda: get_embeddings(job, chunks), job, step_name)
+        embeddings = run_with_retry(
+            lambda: get_embeddings(str(job.id), chunks), str(job.id), step_name
+        )
         if not embeddings:
             logger.info(
                 f"Embedding failed or was cancelled for job ID {job.id}",
@@ -65,7 +69,9 @@ def execute_step(step_name: str, job: Job):
             extra={"job_id": str(job.id), "step_name": step_name},
         )
         stored = run_with_retry(
-            lambda: store_embeddings(job, chunks, embeddings), job, step_name
+            lambda: store_embeddings(str(job.id), chunks, embeddings),
+            str(job.id),
+            step_name,
         )
         if not stored:
             logger.info(

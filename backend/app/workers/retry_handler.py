@@ -7,12 +7,14 @@ from app.services.job_state import transition_job
 logger = logging.getLogger(__name__)
 
 
-def run_with_retry(step_func, job: Job, step_name):
+def run_with_retry(step_func, job_id: str, step_name: str):
+
+    db = SessionLocal()
+    job = db.query(Job).filter(Job.id == job_id).first()
     max_retries = job.max_retries or 3
 
     while job.retry_count < max_retries:
         try:
-            db = SessionLocal()
             logger.info(
                 f"Running step {step_name} (attempt {job.retry_count+1})",
                 extra={"job_id": str(job.id), "step_name": step_name},
@@ -43,11 +45,6 @@ def run_with_retry(step_func, job: Job, step_name):
                 )
                 transition_job(job, JobStatus.failed)
                 db.commit()
-                db.refresh(job)
-                logger.info(
-                    f"Status of job : {job.status}",
-                    extra={"job_id": str(job.id), "step_name": step_name},
-                )
                 return
 
             time.sleep(2 * job.retry_count)
