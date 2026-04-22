@@ -1,0 +1,29 @@
+name: Sync to Google Drive
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Mirror to Google Drive
+        uses: wei/rclone@v1
+        env:
+          RCLONE_CONFIG_DRIVE_TYPE: drive
+          RCLONE_CONFIG_DRIVE_SCOPE: drive
+          RCLONE_CONFIG_DRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          RCLONE_CONFIG_DRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          RCLONE_CONFIG_DRIVE_TOKEN: ${{ secrets.GDRIVE_TOKEN }}
+          RCLONE_CONFIG_DRIVE_ROOT_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        with:
+          args: >
+            sync . DRIVE: 
+            --drive-use-trash 
+            --exclude '.git/**' 
+            --exclude '.github/**' 
+            --transfers 16 
+            --checkers 32 
+            --drive-chunk-size 64M 
+            -v
