@@ -5,7 +5,8 @@ from graphql_app.types.gql_types import JobType
 from app.services.delete_job_service import delete_jobs
 from app.services.retrieval import stream_response_async
 from app.services.job_state import transition_job
-from app.core.queue import queue
+from app.core.queue import get_queue
+from app.core.redis_connection import redis_manager
 from app.models.files import Files
 from app.workers.tasks import process_step
 from graphql_app.types.gql_types import return_job
@@ -60,7 +61,13 @@ class JobMutation:
                 .filter(
                     Job.file_id == str(file_id),
                     Job.workflow_type == workflow_type,
-                    Job.status == JobStatus.completed,
+                    Job.status.not_in(
+                        [
+                            JobStatus.completed,
+                            JobStatus.failed,
+                            JobStatus.cancelled,
+                        ]
+                    ),
                 )
                 .first()
             )
@@ -70,6 +77,7 @@ class JobMutation:
             db.add(job)
             db.commit()
             db.refresh(job)
+            queue = get_queue(redis_manager.sync_client)
             queue.enqueue(process_step, str(job.id))
             return JobSuccessResponse(
                 message=f"Workflow {workflow_type} executed successfully with job ID {job.id}"

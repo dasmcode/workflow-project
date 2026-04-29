@@ -1,4 +1,8 @@
 from rq import Queue
-from app.core.redis_connection import redis_client
+from redis import Redis
 
-queue = Queue("job-queue", connection=redis_client)
+
+def get_queue(redis_client: Redis):
+    if not redis_client:
+        raise ValueError("Redis client is not initialized")
+    return Queue("job-queue", connection=redis_client)

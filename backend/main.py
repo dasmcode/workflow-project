@@ -6,6 +6,7 @@ from app.core.qdrant_client import create_collection
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.logging_config import setup_logging
 from graphql_app.controller import graphql_router
+from app.core.redis_connection import redis_manager
 
 origins = [
     "http://localhost:3000",
@@ -19,7 +20,10 @@ async def lifespan(app: FastAPI):
     setup_logging()
     init_db()
     create_collection()
+    redis_manager.connect_sync()
+    await redis_manager.connect_async()
     yield
+    await redis_manager.disconnect_all()
     print("Shutting down the application...")
 
 

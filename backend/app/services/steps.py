@@ -9,17 +9,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def execute_step(step_name: str, job: Job):
+async def execute_step(step_name: str, job: Job):
     if step_name == "extract_text":
         logger.info(
             f"Extracting text for job ID {job.id}",
             extra={"job_id": str(job.id), "step_name": step_name},
         )
         text = run_with_retry(lambda: extract_text(job), str(job.id), step_name)
-        set_step_data(str(job.id), step_name, text)
+        await set_step_data(str(job.id), step_name, text)
 
     elif step_name == "summarize":
-        text = get_step_data(str(job.id), "extract_text")
+        text = await get_step_data(str(job.id), "extract_text")
         logger.info(
             f"Summarizing for job ID {job.id}",
             extra={"job_id": str(job.id), "step_name": step_name},
@@ -42,7 +42,7 @@ def execute_step(step_name: str, job: Job):
             return
 
     elif step_name == "chunk":
-        text = get_step_data(str(job.id), "extract_text")
+        text = await get_step_data(str(job.id), "extract_text")
         chunks = run_with_retry(lambda: chunk_text(job, text), str(job.id), step_name)
         if not chunks:
             logger.info(
@@ -50,11 +50,11 @@ def execute_step(step_name: str, job: Job):
                 extra={"job_id": str(job.id), "step_name": step_name},
             )
             return
-        set_step_data(str(job.id), step_name, chunks)
-        delete_step_data(str(job.id), "extract_text")
+        await set_step_data(str(job.id), step_name, chunks)
+        await delete_step_data(str(job.id), "extract_text")
 
     elif step_name == "embed_and_store":
-        chunks = get_step_data(str(job.id), "chunk")
+        chunks = await get_step_data(str(job.id), "chunk")
         embeddings = run_with_retry(
             lambda: get_embeddings(str(job.id), chunks), str(job.id), step_name
         )
@@ -83,7 +83,7 @@ def execute_step(step_name: str, job: Job):
             f"Embeddings stored successfully for job ID {job.id}",
             extra={"job_id": str(job.id), "step_name": step_name},
         )
-        delete_step_data(str(job.id), "chunk")
+        await delete_step_data(str(job.id), "chunk")
 
     elif step_name == "query":
         logger.info(

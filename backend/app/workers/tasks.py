@@ -3,9 +3,10 @@ from app.services.cancel_service import check_cancel
 from app.core.database import SessionLocal
 from app.models.jobs import Job, JobStatus
 from app.services.steps import execute_step
-from app.core.queue import queue
+from app.core.queue import get_queue
 from app.services.job_state import transition_job
-import logging
+from app.core.redis_connection import redis_manager
+import logging, asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,8 @@ def process_step(job_id: str):
         db.commit()
         db.refresh(job)
 
-        execute_step(current_step, job)
+        asyncio.run(execute_step(current_step, job))
+
         db.refresh(job)
 
         if check_cancel(db, job):
@@ -64,6 +66,7 @@ def process_step(job_id: str):
         db.refresh(job)
 
         if job.step_index < len(workflow):
+            queue = get_queue(redis_manager.sync_client)
             queue.enqueue(process_step, str(job.id))
         else:
             if check_cancel(db, job):

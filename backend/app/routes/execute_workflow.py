@@ -6,7 +6,8 @@ from app.models.jobs import Job, JobStatus
 from app.models.files import Files
 from app.models.request_payloads import WorkflowExecutionRequest
 from app.utils.file_handler import save_file
-from app.core.queue import queue
+from app.core.queue import get_queue
+from app.core.redis_connection import redis_manager
 from app.workers.tasks import process_step
 
 router = APIRouter()
@@ -39,6 +40,7 @@ def execute_workflow(request: WorkflowExecutionRequest, db: Session = Depends(ge
         db.add(job)
         db.commit()
         db.refresh(job)
+        queue = get_queue(redis_manager.sync_client)
         queue.enqueue(process_step, str(job.id))
         return JSONResponse(
             content={
