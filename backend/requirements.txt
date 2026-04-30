@@ -1,6 +1,4 @@
 uvicorn[standard]
-pandas
-numpy
 pydantic
 python-dotenv
 sqlalchemy
@@ -12,7 +10,6 @@ rq
 openai
 tiktoken
 qdrant-client
-pymupdf
 strawberry-graphql[fastapi]
 docling[tesserocr]
 docling-core[chunking-openai]

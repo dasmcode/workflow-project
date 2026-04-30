@@ -30,7 +30,7 @@ services:
       - 8000:8000
     volumes:
       - uploads_files:/appuser/uploads:rw
-      - ./backend/model_cache/docling:/appuser/.cache/docling:ro
+      # - ./backend/model_cache/docling:/appuser/.cache/docling:ro
   worker:
     env_file:
       - ./backend/.env
