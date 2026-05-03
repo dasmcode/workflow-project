@@ -63,11 +63,9 @@ def store_embeddings(job_id: str, chunks: list[str], embeddings: list[list[float
         job = db.query(Job).filter(Job.id == job_id).first()
         points = []
         index_name = f"idx_{str(job.id).replace('-', '_')}"
-        query = text(
-            f"""
+        query = text(f"""
         CREATE INDEX IF NOT EXISTS "{index_name}" ON "{CHUNKS_TABLE}" USING bm25(content) WITH (text_config='english') WHERE job_id=:job_id;
-        """
-        )
+        """)
         db.execute(query, {"job_id": str(job.id)})
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             if check_cancel(db, job):
@@ -114,7 +112,7 @@ def search_similar(
         limit=top_k,
     )
     return [
-        hit.payload["text"]
+        {"id": hit.id, "text": hit.payload["text"], "score": hit.score}
         for hit in search_result.points
         if hit.score >= SCORE_THRESHOLD
     ]

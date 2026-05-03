@@ -46,7 +46,7 @@ def process_step(job_id: str):
         db.refresh(job)
 
         asyncio.run(execute_step(current_step, job))
-
+        db.commit()
         db.refresh(job)
 
         if check_cancel(db, job):
