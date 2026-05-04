@@ -4,7 +4,8 @@ from app.core.openai_client import client
 from app.services.cancel_service import check_cancel
 from app.core.database import SessionLocal
 from sqlalchemy.orm import Session
-import logging
+import logging, asyncio
+from app.utils.retrieval_utils import HybridRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,10 @@ Chunks:
 
     try:
         indices = [int(x.strip()) - 1 for x in ranking.split(",")]
-    except:
+    except Exception as e:
+        logger.info(
+            f"Failed to rerank chunks for query: {e}\nFalling back to first 5 chunks"
+        )
         return chunks[:5]
 
     reranked = [chunks[i] for i in indices if i < len(chunks)]
@@ -69,6 +73,7 @@ def call_llm_with_context_streaming(user_prompt: str, system_prompt: str):
 
 
 async def stream_response_async(db: Session, job: Job, query: str = ""):
+    retriever = HybridRetriever()
     try:
         if check_cancel(db, job):
             logger.info(
@@ -76,20 +81,41 @@ async def stream_response_async(db: Session, job: Job, query: str = ""):
                 extra={"job_id": str(job.id), "step_name": "query"},
             )
             return
-        response = client.embeddings.create(
-            model="text-embedding-3-small", input=query, dimensions=1024
+
+        semantic_results, bm25_results = await asyncio.gather(
+            retriever.get_semantic_results(query, str(job.id), 25),
+            retriever.get_bm25_results(query, str(job.id), 25),
         )
-        query_embedding = response.data[0].embedding
+        if not semantic_results or not bm25_results:
+            raise ValueError("Either semantic or bm25 results not found")
+        logger.info(
+            f"Retrieval completed for job ID {job.id}. Semantic results: {len(semantic_results)}, BM25 results: {len(bm25_results)}",
+            extra={
+                "job_id": str(job.id),
+                "step_name": "query",
+            },
+        )
+        rrf_fused_results = retriever.fuse_results(
+            semantic_results, bm25_results, alpha=0.5
+        )
+        if not rrf_fused_results:
+            raise ValueError("No rrf fused results found")
+        logger.info(
+            f"Fusion completed for job ID {job.id}. Input chunks: {len(rrf_fused_results)}",
+            extra={
+                "job_id": str(job.id),
+                "step_name": "query",
+            },
+        )
         if check_cancel(db, job):
             logger.info(
                 f"Job with id {job.id} has been cancelled",
                 extra={"job_id": str(job.id), "step_name": "query"},
             )
             return
-        relevant_chunks = search_similar(job, query_embedding, 20, 0.40)
-        top_chunks = rerank_chunks(query, relevant_chunks)
+        top_chunks = rerank_chunks(query, rrf_fused_results[:10])
         logging.info(
-            f"Reranking completed for job ID {job.id}. Input chunks: {len(relevant_chunks)}, Output chunks: {len(top_chunks)}",
+            f"Reranking completed for job ID {job.id}. Input chunks: {len(rrf_fused_results)}, Output chunks: {len(top_chunks)}",
             extra={
                 "job_id": str(job.id),
                 "step_name": "rerank",
@@ -131,7 +157,7 @@ def stream_response(db: Session, job: Job, query: str = ""):
                 extra={"job_id": str(job.id), "step_name": "query"},
             )
             return False
-        relevant_chunks = search_similar(job, query_embedding)
+        relevant_chunks = search_similar((job.id), query_embedding)
         context = "\n".join(relevant_chunks)
         prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         system_prompt = "You are a helpful assistant that answers questions based on the provided context."

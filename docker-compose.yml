@@ -30,7 +30,6 @@ services:
       - 8000:8000
     volumes:
       - uploads_files:/appuser/uploads:rw
-      # - ./backend/model_cache/docling:/appuser/.cache/docling:ro
   worker:
     env_file:
       - ./backend/.env
@@ -75,6 +74,8 @@ services:
       - "5050:80"
     depends_on:
       - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
 
   redis:
     networks:
@@ -97,5 +98,6 @@ volumes:
   redis-data:
   qdrant_data:
   uploads_files:
+  pgadmin_data:
 networks:
   app-network:

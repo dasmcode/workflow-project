@@ -98,7 +98,7 @@ def store_embeddings(job_id: str, chunks: list[str], embeddings: list[list[float
 
 
 def search_similar(
-    job: Job,
+    job_id: str,
     query_embedding: list[float],
     top_k: int = 5,
     SCORE_THRESHOLD: float = 0.50,
@@ -107,7 +107,7 @@ def search_similar(
         collection_name=QDRANT_COLLECTION,
         query=query_embedding,
         query_filter=Filter(
-            must=[FieldCondition(key="job_id", match=MatchValue(value=str(job.id)))]
+            must=[FieldCondition(key="job_id", match=MatchValue(value=job_id))]
         ),
         limit=top_k,
     )
