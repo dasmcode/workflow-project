@@ -7,6 +7,8 @@ from app.core.queue import get_queue
 from app.services.job_state import transition_job
 from app.core.redis_connection import redis_manager
 import logging, asyncio
+from app.core.metrics import JOB_STARTED, JOB_COMPLETED, JOB_FAILED
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,7 @@ def process_step(job_id: str):
         current_step = workflow[step_index]
         if job.status == JobStatus.pending:
             transition_job(job, JobStatus.processing)
+            JOB_STARTED.labels(job.workflow_type).inc()
         job.current_step = current_step
         db.commit()
         db.refresh(job)
@@ -60,6 +63,7 @@ def process_step(job_id: str):
                 f"Job with ID {job_id} failed during step execution",
                 extra={"job_id": job_id, "step_name": current_step},
             )
+            JOB_FAILED.labels(job.workflow_type).inc()
             return
         job.step_index += 1
         db.commit()
@@ -81,6 +85,7 @@ def process_step(job_id: str):
                 f"Job with ID {job_id} completed successfully",
                 extra={"job_id": job_id, "step_name": current_step},
             )
+            JOB_COMPLETED.labels(job.workflow_type).inc()
     except Exception as e:
         logger.error(
             f"Error processing job with ID {job_id}: {str(e)}",
@@ -88,5 +93,6 @@ def process_step(job_id: str):
         )
         transition_job(job, JobStatus.failed)
         db.commit()
+        JOB_FAILED.labels(job.workflow_type).inc()
     finally:
         db.close()

@@ -30,6 +30,7 @@ services:
       - 8000:8000
     volumes:
       - uploads_files:/appuser/uploads:rw
+      - prometheus_data:/tmp/prometheus
   worker:
     env_file:
       - ./backend/.env
@@ -40,6 +41,8 @@ services:
       - app-network
     image: workflow-backend:latest
     command: uv run python -m app.workers.worker
+    environment:
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
     develop:
       watch:
         - action: sync
@@ -47,7 +50,23 @@ services:
           target: /appuser
     volumes:
       - uploads_files:/appuser/uploads
+      - prometheus_data:/tmp/prometheus
       - ./backend/model_cache/docling:/appuser/.cache/docling:ro
+
+  worker-metrics:
+    networks:
+      - app-network
+    depends_on:
+      - worker
+    build:
+      context: ./backend
+    command: uv run uvicorn app.workers.worker_metrics_server:app --host 0.0.0.0 --port 8001
+    environment:
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+    volumes:
+      - prometheus_data:/tmp/prometheus
+    ports:
+      - 8001:8001
   postgres:
     env_file:
       - ./backend/.env
@@ -93,11 +112,22 @@ services:
       - 6333:6333
     volumes:
       - qdrant_data:/qdrant/storage
+  prometheus:
+    networks:
+      - app-network
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - backend
 volumes:
   pg_data:
   redis-data:
   qdrant_data:
   uploads_files:
   pgadmin_data:
+  prometheus_data:
 networks:
   app-network:

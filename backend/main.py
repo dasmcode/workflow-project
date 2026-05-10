@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from contextlib import asynccontextmanager
 from app.routers import IncludeAPIRouter
 from app.core.database import init_db
@@ -7,6 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.logging_config import setup_logging
 from graphql_app.controller import graphql_router
 from app.core.redis_connection import redis_manager
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from app.utils.metrics_registry import get_registry
+import os
 
 origins = [
     "http://localhost:3000",
@@ -41,8 +44,15 @@ def init_application():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @_app.get("/metrics")
+    def metrics():
+        registry = get_registry()
+        return Response(generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
+
     _app.include_router(IncludeAPIRouter())
     _app.include_router(graphql_router, tags=["GraphQL"])
+
     return _app
 
 

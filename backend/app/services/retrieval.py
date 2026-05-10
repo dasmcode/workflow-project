@@ -4,8 +4,16 @@ from app.core.openai_client import client
 from app.services.cancel_service import check_cancel
 from app.core.database import SessionLocal
 from sqlalchemy.orm import Session
-import logging, asyncio
+import logging, asyncio, time
 from app.utils.retrieval_utils import HybridRetriever
+from app.core.metrics import (
+    RAG_RETRIEVAL_COUNT,
+    RAG_RERANK_INPUT,
+    RAG_RERANK_OUTPUT,
+    LLM_TTFT,
+    LLM_STREAM_DURATION,
+    LLM_REQUESTS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +56,9 @@ Chunks:
 
 
 def call_llm_with_context(user_prompt: str, system_prompt: str):
+    start_time = time.time()
+    first_token_time = None
+    LLM_REQUESTS.inc()
     response = client.chat.completions.create(
         model="gpt-5.4-mini",
         messages=[
@@ -59,6 +70,9 @@ def call_llm_with_context(user_prompt: str, system_prompt: str):
 
 
 def call_llm_with_context_streaming(user_prompt: str, system_prompt: str):
+    start_time = time.time()
+    first_token_time = None
+    LLM_REQUESTS.inc()
     response = client.chat.completions.create(
         model="gpt-5.4-mini",
         messages=[
@@ -69,7 +83,11 @@ def call_llm_with_context_streaming(user_prompt: str, system_prompt: str):
     )
     for chunk in response:
         if chunk.choices[0].delta.content:
+            if first_token_time is None:
+                first_token_time = time.time()
+                LLM_TTFT.observe(first_token_time - start_time)
             yield chunk.choices[0].delta.content
+    LLM_STREAM_DURATION.observe(time.time() - start_time)
 
 
 async def stream_response_async(db: Session, job: Job, query: str = ""):
@@ -87,7 +105,9 @@ async def stream_response_async(db: Session, job: Job, query: str = ""):
             retriever.get_bm25_results(query, str(job.id), 25),
         )
         if not semantic_results or not bm25_results:
-            raise ValueError("Either semantic or bm25 results not found")
+            raise ValueError(
+                f"Either semantic or bm25 results not found: {semantic_results}, {bm25_results}"
+            )
         logger.info(
             f"Retrieval completed for job ID {job.id}. Semantic results: {len(semantic_results)}, BM25 results: {len(bm25_results)}",
             extra={
@@ -107,12 +127,14 @@ async def stream_response_async(db: Session, job: Job, query: str = ""):
                 "step_name": "query",
             },
         )
+        RAG_RETRIEVAL_COUNT.observe(len(rrf_fused_results))
         if check_cancel(db, job):
             logger.info(
                 f"Job with id {job.id} has been cancelled",
                 extra={"job_id": str(job.id), "step_name": "query"},
             )
             return
+        RAG_RERANK_INPUT.observe(len(rrf_fused_results))
         top_chunks = rerank_chunks(query, rrf_fused_results[:10])
         logging.info(
             f"Reranking completed for job ID {job.id}. Input chunks: {len(rrf_fused_results)}, Output chunks: {len(top_chunks)}",
@@ -121,6 +143,7 @@ async def stream_response_async(db: Session, job: Job, query: str = ""):
                 "step_name": "rerank",
             },
         )
+        RAG_RERANK_OUTPUT.observe(len(top_chunks))
         context = "\n".join(top_chunks)
         prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
         system_prompt = "You are a helpful assistant that answers questions based on the provided context."
@@ -138,7 +161,7 @@ async def stream_response_async(db: Session, job: Job, query: str = ""):
             f"Streaming error: {str(e)}",
             extra={"job_id": job_id, "step_name": "query"},
         )
-        yield f"[ERROR: {str(e)}]"
+        yield f"[ERROR]"
 
 
 def stream_response(db: Session, job: Job, query: str = ""):

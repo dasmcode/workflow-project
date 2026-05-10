@@ -1,8 +1,9 @@
-from rq import Worker, Queue
+from rq import Worker
 from app.core.redis_connection import redis_manager
 from app.core.logging_config import setup_logging
 from app.core.queue import get_queue
-import logging, asyncio
+import logging, asyncio, os
+from prometheus_client import multiprocess
 
 logger = logging.getLogger(__name__)
 
