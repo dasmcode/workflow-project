@@ -122,6 +122,22 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     depends_on:
       - backend
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3030:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
 volumes:
   pg_data:
   redis-data:
@@ -129,5 +145,7 @@ volumes:
   uploads_files:
   pgadmin_data:
   prometheus_data:
+  grafana_data:
+    external: true
 networks:
   app-network:
