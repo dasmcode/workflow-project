@@ -7,3 +7,4 @@ uploads/*
 model_cache/*
 pyproject.toml
 uv.lock
+.env
